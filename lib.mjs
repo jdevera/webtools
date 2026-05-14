@@ -1,5 +1,5 @@
 const TITLE_RE = /<title>([^<]+)<\/title>/i;
-const DESC_RE = /<meta\s+name=["']description["']\s+content=["']([^"']+)["']\s*\/?>/i;
+const DESC_RE = /<meta\s+name=["']description["']\s+content=["']([^"']+)["'][^>]*>/i;
 
 export function extractMeta(html) {
   const titleMatch = html.match(TITLE_RE);

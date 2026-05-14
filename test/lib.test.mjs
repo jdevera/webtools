@@ -34,3 +34,13 @@ test('extractMeta accepts single-quoted meta attributes', () => {
   const html = `<title>X</title><meta name='description' content='y'>`;
   assert.equal(extractMeta(html).description, 'y');
 });
+
+test('extractMeta accepts trailing attributes on description meta', () => {
+  const html = `<title>X</title><meta name="description" content="y" id="d">`;
+  assert.equal(extractMeta(html).description, 'y');
+});
+
+test('extractMeta accepts self-closing description meta', () => {
+  const html = `<title>X</title><meta name="description" content="z" />`;
+  assert.equal(extractMeta(html).description, 'z');
+});
