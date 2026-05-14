@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { extractMeta } from '../lib.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { extractMeta, discoverTools } from '../lib.mjs';
 
 test('extractMeta pulls title and description from HTML', () => {
   const html = `
@@ -43,4 +46,59 @@ test('extractMeta accepts trailing attributes on description meta', () => {
 test('extractMeta accepts self-closing description meta', () => {
   const html = `<title>X</title><meta name="description" content="z" />`;
   assert.equal(extractMeta(html).description, 'z');
+});
+
+function makeToolsDir() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'htmltools-tools-'));
+}
+
+function writeTool(dir, slug, title, desc) {
+  fs.mkdirSync(path.join(dir, slug), { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, slug, 'index.html'),
+    `<title>${title}</title><meta name="description" content="${desc}">`
+  );
+}
+
+test('discoverTools returns tools sorted by title', () => {
+  const dir = makeToolsDir();
+  writeTool(dir, 'bravo', 'Bravo Tool', 'B');
+  writeTool(dir, 'alpha', 'Alpha Tool', 'A');
+
+  const tools = discoverTools(dir);
+  assert.deepEqual(tools, [
+    { slug: 'alpha', title: 'Alpha Tool', description: 'A' },
+    { slug: 'bravo', title: 'Bravo Tool', description: 'B' },
+  ]);
+});
+
+test('discoverTools skips folders without index.html', () => {
+  const dir = makeToolsDir();
+  fs.mkdirSync(path.join(dir, 'empty-folder'));
+  writeTool(dir, 'real', 'Real', 'x');
+
+  const tools = discoverTools(dir);
+  assert.equal(tools.length, 1);
+  assert.equal(tools[0].slug, 'real');
+});
+
+test('discoverTools skips loose files at the top level', () => {
+  const dir = makeToolsDir();
+  fs.writeFileSync(path.join(dir, 'README.md'), '# notes');
+  writeTool(dir, 'real', 'Real', 'x');
+
+  const tools = discoverTools(dir);
+  assert.equal(tools.length, 1);
+});
+
+test('discoverTools error mentions the offending file path', () => {
+  const dir = makeToolsDir();
+  fs.mkdirSync(path.join(dir, 'broken'));
+  fs.writeFileSync(path.join(dir, 'broken/index.html'), '<title>No description</title>');
+
+  assert.throws(
+    () => discoverTools(dir),
+    (err) => err.message.includes(path.join(dir, 'broken', 'index.html'))
+      && /description/i.test(err.message)
+  );
 });

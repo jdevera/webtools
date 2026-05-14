@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 const TITLE_RE = /<title>([^<]+)<\/title>/i;
 const DESC_RE = /<meta\s+name=["']description["']\s+content=["']([^"']+)["'][^>]*>/i;
 
@@ -10,4 +13,24 @@ export function extractMeta(html) {
     title: titleMatch[1].trim(),
     description: descMatch[1].trim(),
   };
+}
+
+export function discoverTools(toolsDir) {
+  const entries = fs.readdirSync(toolsDir, { withFileTypes: true });
+  const tools = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const indexPath = path.join(toolsDir, entry.name, 'index.html');
+    if (!fs.existsSync(indexPath)) continue;
+    const html = fs.readFileSync(indexPath, 'utf8');
+    let meta;
+    try {
+      meta = extractMeta(html);
+    } catch (e) {
+      throw new Error(`${indexPath}: ${e.message}`);
+    }
+    tools.push({ slug: entry.name, title: meta.title, description: meta.description });
+  }
+  tools.sort((a, b) => a.title.localeCompare(b.title));
+  return tools;
 }
