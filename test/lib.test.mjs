@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { extractMeta, discoverTools, renderIndex } from '../lib.mjs';
+import { extractMeta, discoverTools, renderIndex, main } from '../lib.mjs';
 
 test('extractMeta pulls title and description from HTML', () => {
   const html = `
@@ -134,4 +134,50 @@ test('renderIndex with empty tools list produces empty placeholder', () => {
   const template = '<ul><!-- TOOLS --></ul>';
   const html = renderIndex(template, []);
   assert.equal(html, '<ul></ul>');
+});
+
+test('main builds dist with index, copied tools, and copied styles', () => {
+  const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'htmltools-build-'));
+
+  fs.mkdirSync(path.join(repoDir, '_index'));
+  fs.writeFileSync(
+    path.join(repoDir, '_index/template.html'),
+    '<html><body><ul><!-- TOOLS --></ul></body></html>'
+  );
+  fs.writeFileSync(path.join(repoDir, '_index/style.css'), 'body{color:red}');
+
+  fs.mkdirSync(path.join(repoDir, 'tools/foo'), { recursive: true });
+  fs.writeFileSync(
+    path.join(repoDir, 'tools/foo/index.html'),
+    '<title>Foo</title><meta name="description" content="F"><body>foo</body>'
+  );
+  fs.mkdirSync(path.join(repoDir, 'tools/foo/assets'));
+  fs.writeFileSync(path.join(repoDir, 'tools/foo/assets/icon.svg'), '<svg/>');
+
+  const distDir = path.join(repoDir, 'dist');
+  main({ repoDir, distDir });
+
+  assert.ok(fs.existsSync(path.join(distDir, 'index.html')), 'dist/index.html exists');
+  assert.ok(fs.existsSync(path.join(distDir, '_index/style.css')), 'style.css copied');
+  assert.ok(fs.existsSync(path.join(distDir, 'tools/foo/index.html')), 'tool index copied');
+  assert.ok(fs.existsSync(path.join(distDir, 'tools/foo/assets/icon.svg')), 'tool subfile copied');
+  assert.ok(!fs.existsSync(path.join(distDir, '_index/template.html')), 'template not copied');
+
+  const indexHtml = fs.readFileSync(path.join(distDir, 'index.html'), 'utf8');
+  assert.match(indexHtml, /<a href="\/tools\/foo\/">/);
+});
+
+test('main wipes dist before building (stale files removed)', () => {
+  const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'htmltools-build-'));
+  fs.mkdirSync(path.join(repoDir, '_index'));
+  fs.writeFileSync(path.join(repoDir, '_index/template.html'), '<!-- TOOLS -->');
+  fs.writeFileSync(path.join(repoDir, '_index/style.css'), '');
+
+  const distDir = path.join(repoDir, 'dist');
+  fs.mkdirSync(distDir, { recursive: true });
+  fs.writeFileSync(path.join(distDir, 'stale.txt'), 'should be removed');
+
+  main({ repoDir, distDir });
+
+  assert.ok(!fs.existsSync(path.join(distDir, 'stale.txt')), 'stale files cleared');
 });

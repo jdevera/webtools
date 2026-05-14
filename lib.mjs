@@ -54,3 +54,36 @@ export function renderIndex(template, tools) {
   ).join('\n');
   return template.replace('<!-- TOOLS -->', items);
 }
+
+function copyDir(src, dst) {
+  fs.mkdirSync(dst, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const s = path.join(src, entry.name);
+    const d = path.join(dst, entry.name);
+    if (entry.isDirectory()) copyDir(s, d);
+    else fs.copyFileSync(s, d);
+  }
+}
+
+export function main({ repoDir = process.cwd(), distDir = path.join(repoDir, 'dist') } = {}) {
+  fs.rmSync(distDir, { recursive: true, force: true });
+  fs.mkdirSync(distDir, { recursive: true });
+
+  const toolsDir = path.join(repoDir, 'tools');
+  const tools = fs.existsSync(toolsDir) ? discoverTools(toolsDir) : [];
+
+  const template = fs.readFileSync(path.join(repoDir, '_index/template.html'), 'utf8');
+  fs.writeFileSync(path.join(distDir, 'index.html'), renderIndex(template, tools));
+
+  const indexSrc = path.join(repoDir, '_index');
+  const indexDst = path.join(distDir, '_index');
+  fs.mkdirSync(indexDst, { recursive: true });
+  for (const entry of fs.readdirSync(indexSrc)) {
+    if (entry === 'template.html') continue;
+    fs.copyFileSync(path.join(indexSrc, entry), path.join(indexDst, entry));
+  }
+
+  if (fs.existsSync(toolsDir)) {
+    copyDir(toolsDir, path.join(distDir, 'tools'));
+  }
+}
