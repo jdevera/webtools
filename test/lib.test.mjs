@@ -49,7 +49,7 @@ test('extractMeta accepts self-closing description meta', () => {
 });
 
 function makeToolsDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'htmltools-tools-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'webtools-tools-'));
 }
 
 function writeTool(dir, slug, title, desc) {
@@ -137,7 +137,7 @@ test('renderIndex with empty tools list produces empty placeholder', () => {
 });
 
 test('main builds dist with index, copied tools, and copied styles', () => {
-  const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'htmltools-build-'));
+  const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'webtools-build-'));
 
   fs.mkdirSync(path.join(repoDir, '_index'));
   fs.writeFileSync(
@@ -168,7 +168,7 @@ test('main builds dist with index, copied tools, and copied styles', () => {
 });
 
 test('main wipes dist before building (stale files removed)', () => {
-  const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'htmltools-build-'));
+  const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'webtools-build-'));
   fs.mkdirSync(path.join(repoDir, '_index'));
   fs.writeFileSync(path.join(repoDir, '_index/template.html'), '<!-- TOOLS -->');
   fs.writeFileSync(path.join(repoDir, '_index/style.css'), '');
@@ -183,7 +183,7 @@ test('main wipes dist before building (stale files removed)', () => {
 });
 
 test('main copies subdirectories inside _index/', () => {
-  const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'htmltools-build-'));
+  const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'webtools-build-'));
   fs.mkdirSync(path.join(repoDir, '_index'));
   fs.writeFileSync(path.join(repoDir, '_index/template.html'), '<!-- TOOLS -->');
   fs.writeFileSync(path.join(repoDir, '_index/style.css'), '');

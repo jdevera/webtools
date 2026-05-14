@@ -1,4 +1,4 @@
-# htmltools
+# webtools
 
 Tiny single-file browser tools, deployed by `git push` on Cloudflare Pages.
 
