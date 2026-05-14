@@ -78,9 +78,12 @@ export function main({ repoDir = process.cwd(), distDir = path.join(repoDir, 'di
   const indexSrc = path.join(repoDir, '_index');
   const indexDst = path.join(distDir, '_index');
   fs.mkdirSync(indexDst, { recursive: true });
-  for (const entry of fs.readdirSync(indexSrc)) {
-    if (entry === 'template.html') continue;
-    fs.copyFileSync(path.join(indexSrc, entry), path.join(indexDst, entry));
+  for (const entry of fs.readdirSync(indexSrc, { withFileTypes: true })) {
+    if (entry.name === 'template.html') continue;
+    const s = path.join(indexSrc, entry.name);
+    const d = path.join(indexDst, entry.name);
+    if (entry.isDirectory()) copyDir(s, d);
+    else fs.copyFileSync(s, d);
   }
 
   if (fs.existsSync(toolsDir)) {

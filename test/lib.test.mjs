@@ -181,3 +181,17 @@ test('main wipes dist before building (stale files removed)', () => {
 
   assert.ok(!fs.existsSync(path.join(distDir, 'stale.txt')), 'stale files cleared');
 });
+
+test('main copies subdirectories inside _index/', () => {
+  const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'htmltools-build-'));
+  fs.mkdirSync(path.join(repoDir, '_index'));
+  fs.writeFileSync(path.join(repoDir, '_index/template.html'), '<!-- TOOLS -->');
+  fs.writeFileSync(path.join(repoDir, '_index/style.css'), '');
+  fs.mkdirSync(path.join(repoDir, '_index/fonts'));
+  fs.writeFileSync(path.join(repoDir, '_index/fonts/foo.woff2'), 'binary');
+
+  const distDir = path.join(repoDir, 'dist');
+  main({ repoDir, distDir });
+
+  assert.ok(fs.existsSync(path.join(distDir, '_index/fonts/foo.woff2')), 'subdir file copied');
+});
