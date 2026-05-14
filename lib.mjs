@@ -34,3 +34,23 @@ export function discoverTools(toolsDir) {
   tools.sort((a, b) => a.title.localeCompare(b.title));
   return tools;
 }
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[c]));
+}
+
+export function renderIndex(template, tools) {
+  const items = tools.map((t) =>
+    `<li><a href="/tools/${encodeURIComponent(t.slug)}/">` +
+    `<strong>${escapeHtml(t.title)}</strong>` +
+    `<small>${escapeHtml(t.description)}</small>` +
+    `</a></li>`
+  ).join('\n');
+  return template.replace('<!-- TOOLS -->', items);
+}

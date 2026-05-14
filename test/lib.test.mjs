@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { extractMeta, discoverTools } from '../lib.mjs';
+import { extractMeta, discoverTools, renderIndex } from '../lib.mjs';
 
 test('extractMeta pulls title and description from HTML', () => {
   const html = `
@@ -101,4 +101,37 @@ test('discoverTools error mentions the offending file path', () => {
     (err) => err.message.includes(path.join(dir, 'broken', 'index.html'))
       && /description/i.test(err.message)
   );
+});
+
+test('renderIndex replaces <!-- TOOLS --> with li items', () => {
+  const template = '<ul><!-- TOOLS --></ul>';
+  const tools = [
+    { slug: 'alpha', title: 'Alpha', description: 'First' },
+    { slug: 'bravo', title: 'Bravo', description: 'Second' },
+  ];
+  const html = renderIndex(template, tools);
+  assert.match(html, /<a href="\/tools\/alpha\/">/);
+  assert.match(html, /<a href="\/tools\/bravo\/">/);
+  assert.match(html, /<strong>Alpha<\/strong>/);
+  assert.match(html, /First/);
+  assert.ok(html.indexOf('alpha') < html.indexOf('bravo'), 'order from input is preserved');
+});
+
+test('renderIndex escapes HTML in title and description', () => {
+  const template = '<!-- TOOLS -->';
+  const tools = [{
+    slug: 'x',
+    title: '<script>alert(1)</script>',
+    description: 'a "&" b',
+  }];
+  const html = renderIndex(template, tools);
+  assert.ok(!html.includes('<script>alert(1)</script>'), 'raw script must not appear');
+  assert.match(html, /&lt;script&gt;/);
+  assert.match(html, /&quot;&amp;&quot;/);
+});
+
+test('renderIndex with empty tools list produces empty placeholder', () => {
+  const template = '<ul><!-- TOOLS --></ul>';
+  const html = renderIndex(template, []);
+  assert.equal(html, '<ul></ul>');
 });
