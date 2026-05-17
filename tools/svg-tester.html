@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SVG Icon Tester</title>
+  <style>
+    :root {
+      --pad: 14px;
+      --gap: 12px;
+      --border: rgba(255,255,255,0.12);
+      --muted: rgba(255,255,255,0.7);
+      --bg: #0f111a;
+      --panel: #151827;
+      --panel2: #101322;
+      --text: #e6e6f0;
+      --accent: #A78BFA;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      padding: 18px 18px 10px 18px;
+      display: flex;
+      gap: 16px;
+      align-items: baseline;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 {
+      font-size: 16px;
+      margin: 0;
+      letter-spacing: 0.02em;
+      font-weight: 800;
+    }
+
+    header .description {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 0;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 0;
+      min-height: calc(100vh - 62px);
+    }
+
+    .left {
+      border-right: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .group {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(0,0,0,0.22);
+    }
+
+    .group h2 {
+      font-size: 12px;
+      margin: 0 0 10px 0;
+      color: var(--muted);
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin: 10px 0 6px 0;
+    }
+
+    input[type="text"], input[type="number"], textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 10px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 360px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      line-height: 1.35;
+      white-space: pre;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .btnrow {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:hover { border-color: rgba(255,255,255,0.22); }
+    button.primary {
+      background: rgba(167,139,250,0.18);
+      border-color: rgba(167,139,250,0.45);
+    }
+    button.danger {
+      background: rgba(248,113,113,0.12);
+      border-color: rgba(248,113,113,0.35);
+    }
+
+    .status {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+      min-height: 16px;
+    }
+
+    .right {
+      padding: 16px;
+      overflow: auto;
+    }
+
+    table {
+      width: max-content;
+      border-collapse: separate;
+      border-spacing: 0;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.03);
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: rgba(16,19,34,0.95);
+      backdrop-filter: blur(6px);
+      border-bottom: 1px solid var(--border);
+      z-index: 2;
+    }
+
+    th, td {
+      padding: 14px 16px;
+      vertical-align: middle;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    tbody tr:last-child td { border-bottom: 0; }
+
+    thead th {
+      font-size: 12px;
+      font-weight: 900;
+      opacity: 0.85;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    thead th:first-child {
+      text-align: left;
+      min-width: 240px;
+    }
+
+    td.label {
+      width: 240px;
+      font-size: 14px;
+      font-weight: 800;
+      opacity: 0.92;
+      white-space: nowrap;
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      border-right: 1px solid rgba(255,255,255,0.08);
+    }
+
+    td.cell { width: 110px; text-align: center; }
+
+    .cellInner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .icon svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .size {
+      font-size: 12px;
+      opacity: 0.72;
+    }
+
+    .cellActions {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .mini {
+      padding: 6px 8px;
+      font-size: 12px;
+      border-radius: 9px;
+      font-weight: 800;
+    }
+
+    tr.white     { background: #ffffff; color: #000; }
+    tr.black     { background: #000000; color: #fff; }
+    tr.latte     { background: #eff1f5; color: #4c4f69; }
+    tr.frappe    { background: #303446; color: #c6d0f5; }
+    tr.macchiato { background: #24273a; color: #cad3f5; }
+    tr.mocha     { background: #1e1e2e; color: #cdd6f4; }
+
+    tr.white td.label { background: #ffffff; }
+    tr.black td.label { background: #000000; }
+    tr.latte td.label { background: #eff1f5; }
+    tr.frappe td.label { background: #303446; }
+    tr.macchiato td.label { background: #24273a; }
+    tr.mocha td.label { background: #1e1e2e; }
+
+    .errorBox {
+      border: 1px solid rgba(248,113,113,0.45);
+      background: rgba(248,113,113,0.10);
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.9);
+      display: none;
+    }
+
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      .left { border-right: 0; border-bottom: 1px solid var(--border); }
+      td.label { position: static; border-right: 0; }
+      thead th { position: static; }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>SVG Icon Tester</h1>
+    <p class="description">Paste SVG, tune sizes, preview on multiple backgrounds, export PNG.</p>
+  </header>
+
+  <div class="layout">
+    <div class="left">
+      <div class="group">
+        <h2>SVG input</h2>
+        <label for="svgInput">SVG markup</label>
+        <textarea id="svgInput" spellcheck="false"></textarea>
+        <div id="errorBox" class="errorBox"></div>
+      </div>
+
+      <div class="group">
+        <h2>Preview config</h2>
+        <label for="sizesInput">Sizes (comma-separated px)</label>
+        <input id="sizesInput" type="text" value="16,24,32,48,64,128" />
+
+        <div class="row">
+          <div>
+            <label for="exportScale">PNG export scale factor</label>
+            <input id="exportScale" type="number" min="1" step="1" value="8" />
+          </div>
+          <div>
+            <label for="pngBg">PNG background</label>
+            <input id="pngBg" type="text" value="transparent" />
+          </div>
+        </div>
+
+        <div class="btnrow">
+          <button id="btnRender" class="primary">Render</button>
+          <button id="btnExportAll">Export all PNGs</button>
+          <button id="btnExportCurrent" class="danger" title="Exports the last clicked cell">Export selected PNG</button>
+        </div>
+
+        <div id="status" class="status"></div>
+      </div>
+
+      <div class="group">
+        <h2>Notes</h2>
+        <div style="font-size:12px;color:var(--muted);line-height:1.35">
+          Tips:
+          <ul style="margin:8px 0 0 18px;padding:0">
+            <li>Keep SVG self-contained. External images/fonts can break PNG export due to canvas security.</li>
+            <li>For favicons, judge at 16px and 24px first.</li>
+            <li>Click any cell to select it for &ldquo;Export selected PNG&rdquo;.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="right">
+      <div id="preview"></div>
+    </div>
+  </div>
+
+  <script>
+    const themes = [
+      { name: "white", label: "White", bg: "#ffffff" },
+      { name: "black", label: "Black", bg: "#000000" },
+      { name: "latte", label: "Catppuccin Latte", bg: "#eff1f5" },
+      { name: "frappe", label: "Catppuccin Frappe", bg: "#303446" },
+      { name: "macchiato", label: "Catppuccin Macchiato", bg: "#24273a" },
+      { name: "mocha", label: "Catppuccin Mocha", bg: "#1e1e2e" }
+    ];
+
+    const svgInput = document.getElementById("svgInput");
+    const sizesInput = document.getElementById("sizesInput");
+    const exportScaleInput = document.getElementById("exportScale");
+    const pngBgInput = document.getElementById("pngBg");
+    const preview = document.getElementById("preview");
+    const statusEl = document.getElementById("status");
+    const errorBox = document.getElementById("errorBox");
+
+    const btnRender = document.getElementById("btnRender");
+    const btnExportAll = document.getElementById("btnExportAll");
+    const btnExportCurrent = document.getElementById("btnExportCurrent");
+
+    let selected = null;
+
+    const defaultSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="TES icon with centered T">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A78BFA"/>
+      <stop offset="1" stop-color="#6D28D9"/>
+    </linearGradient>
+  </defs>
+
+  <path fill="url(#g)" d="
+    M48 64
+    q0-20 20-20
+    h120
+    q20 0 20 20
+    v76
+    q0 20-20 20
+    h-66
+    l-34 30
+    q-8 7-8-3
+    v-27
+    h-12
+    q-20 0-20-20
+    z
+  "/>
+
+  <path fill="#F5D0FE" d="
+    M70 64
+    h80
+    v22
+    h-30
+    v56
+    h-20
+    v-56
+    h-30
+    z
+  "/>
+
+  <path fill="#F5D0FE" d="
+    M196 56
+    l10 18
+    l18 10
+    l-18 10
+    l-10 18
+    l-10-18
+    l-18-10
+    l18-10
+    z
+  "/>
+</svg>`;
+
+    svgInput.value = defaultSvg;
+
+    function setStatus(msg) {
+      statusEl.textContent = msg || "";
+    }
+
+    function showError(msg) {
+      if (!msg) {
+        errorBox.style.display = "none";
+        errorBox.textContent = "";
+        return;
+      }
+      errorBox.style.display = "block";
+      errorBox.textContent = msg;
+    }
+
+    function parseSizes(text) {
+      return text
+        .split(",")
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(s => Number(s))
+        .filter(n => Number.isFinite(n) && n > 0)
+        .map(n => Math.round(n));
+    }
+
+    function sanitizeSvg(svgText) {
+      const trimmed = svgText.trim();
+      if (!trimmed.startsWith("<svg")) throw new Error("SVG must start with <svg ...>.");
+      if (!trimmed.includes('xmlns="http://www.w3.org/2000/svg"')) {
+        return trimmed.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+      }
+      return trimmed;
+    }
+
+    function svgToInlineElement(svgText) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgText, "image/svg+xml");
+      const svg = doc.documentElement;
+
+      const parseError = doc.querySelector("parsererror");
+      if (parseError) throw new Error(parseError.textContent || "Invalid SVG.");
+
+      if (!svg.getAttribute("viewBox")) {
+        throw new Error("SVG missing viewBox. Add viewBox=\"0 0 ... ...\" for correct scaling.");
+      }
+
+      svg.removeAttribute("width");
+      svg.removeAttribute("height");
+
+      return svg;
+    }
+
+    function render() {
+      setStatus("");
+      showError("");
+      selected = null;
+
+      let sizes;
+      let svgText;
+      try {
+        sizes = parseSizes(sizesInput.value);
+        if (sizes.length === 0) throw new Error("No valid sizes. Example: 16,24,32,48,64,128");
+        svgText = sanitizeSvg(svgInput.value);
+        svgToInlineElement(svgText);
+      } catch (e) {
+        showError(e.message);
+        preview.innerHTML = "";
+        return;
+      }
+
+      const table = document.createElement("table");
+
+      const thead = document.createElement("thead");
+      const hr = document.createElement("tr");
+      const corner = document.createElement("th");
+      corner.textContent = "Theme";
+      hr.appendChild(corner);
+
+      sizes.forEach(size => {
+        const th = document.createElement("th");
+        th.textContent = `${size}px`;
+        hr.appendChild(th);
+      });
+
+      thead.appendChild(hr);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+
+      themes.forEach(theme => {
+        const tr = document.createElement("tr");
+        tr.className = theme.name;
+
+        const labelTd = document.createElement("td");
+        labelTd.className = "label";
+        labelTd.textContent = theme.label;
+        tr.appendChild(labelTd);
+
+        sizes.forEach(size => {
+          const td = document.createElement("td");
+          td.className = "cell";
+
+          const inner = document.createElement("div");
+          inner.className = "cellInner";
+
+          const iconWrap = document.createElement("div");
+          iconWrap.className = "icon";
+          iconWrap.style.width = size + "px";
+          iconWrap.style.height = size + "px";
+
+          const svgEl = svgToInlineElement(svgText);
+          iconWrap.appendChild(document.importNode(svgEl, true));
+
+          const sizeLabel = document.createElement("div");
+          sizeLabel.className = "size";
+          sizeLabel.textContent = `${size}px`;
+
+          const actions = document.createElement("div");
+          actions.className = "cellActions";
+
+          const pickBtn = document.createElement("button");
+          pickBtn.className = "mini";
+          pickBtn.textContent = "Select";
+          pickBtn.addEventListener("click", () => {
+            selected = { theme, size };
+            setStatus(`Selected: ${theme.label} @ ${size}px`);
+          });
+
+          const pngBtn = document.createElement("button");
+          pngBtn.className = "mini";
+          pngBtn.textContent = "PNG";
+          pngBtn.addEventListener("click", async () => {
+            try {
+              await exportPng(svgText, size, theme, { download: true });
+              setStatus(`Exported PNG: ${theme.name}-${size}px`);
+            } catch (e) {
+              showError(e.message);
+            }
+          });
+
+          actions.appendChild(pickBtn);
+          actions.appendChild(pngBtn);
+
+          inner.appendChild(iconWrap);
+          inner.appendChild(sizeLabel);
+          inner.appendChild(actions);
+          td.appendChild(inner);
+
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      });
+
+      table.appendChild(tbody);
+      preview.innerHTML = "";
+      preview.appendChild(table);
+
+      setStatus(`Rendered ${themes.length} themes × ${sizes.length} sizes.`);
+    }
+
+    function downloadBlob(blob, filename) {
+      const a = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function pngBackgroundFor(theme) {
+      const v = (pngBgInput.value || "").trim().toLowerCase();
+      if (v === "transparent" || v === "") return null;
+      if (v === "theme") return theme.bg;
+      return v;
+    }
+
+    async function exportPng(svgText, sizePx, theme, { download = false } = {}) {
+      const scale = Math.max(1, Math.round(Number(exportScaleInput.value) || 1));
+      const outW = sizePx * scale;
+      const outH = sizePx * scale;
+
+      const svgEl = svgToInlineElement(svgText);
+      const vb = svgEl.getAttribute("viewBox").split(/\s+/).map(Number);
+      if (vb.length !== 4 || vb.some(n => !Number.isFinite(n))) {
+        throw new Error("Invalid viewBox. Expected 4 numbers.");
+      }
+
+      svgEl.setAttribute("width", String(outW));
+      svgEl.setAttribute("height", String(outH));
+
+      const serializer = new XMLSerializer();
+      const serialized = serializer.serializeToString(svgEl);
+
+      const blob = new Blob([serialized], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      try {
+        const img = await new Promise((resolve, reject) => {
+          const i = new Image();
+          i.onload = () => resolve(i);
+          i.onerror = () => reject(new Error("Failed to load SVG as image. If it references external resources, PNG export may fail."));
+          i.src = url;
+        });
+
+        const canvas = document.createElement("canvas");
+        canvas.width = outW;
+        canvas.height = outH;
+        const ctx = canvas.getContext("2d");
+
+        const bg = pngBackgroundFor(theme);
+        if (bg) {
+          ctx.fillStyle = bg;
+          ctx.fillRect(0, 0, outW, outH);
+        }
+
+        ctx.drawImage(img, 0, 0, outW, outH);
+
+        const pngBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+        if (!pngBlob) throw new Error("Canvas export failed.");
+
+        if (download) {
+          const filename = `icon-${theme.name}-${sizePx}px@${scale}x.png`;
+          downloadBlob(pngBlob, filename);
+        }
+
+        return pngBlob;
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    async function exportAll() {
+      showError("");
+      setStatus("Exporting PNGs...");
+      let sizes;
+      let svgText;
+      try {
+        sizes = parseSizes(sizesInput.value);
+        if (sizes.length === 0) throw new Error("No valid sizes.");
+        svgText = sanitizeSvg(svgInput.value);
+        svgToInlineElement(svgText);
+      } catch (e) {
+        showError(e.message);
+        return;
+      }
+
+      for (const theme of themes) {
+        for (const size of sizes) {
+          try {
+            await exportPng(svgText, size, theme, { download: true });
+          } catch (e) {
+            showError(`Export failed at ${theme.label} ${size}px: ${e.message}`);
+            return;
+          }
+        }
+      }
+
+      setStatus("Exported all PNGs.");
+    }
+
+    async function exportSelected() {
+      showError("");
+      if (!selected) {
+        showError("No cell selected. Click “Select” on a cell, or use the per-cell “PNG” button.");
+        return;
+      }
+      try {
+        const svgText = sanitizeSvg(svgInput.value);
+        await exportPng(svgText, selected.size, selected.theme, { download: true });
+        setStatus(`Exported selected PNG: ${selected.theme.label} @ ${selected.size}px`);
+      } catch (e) {
+        showError(e.message);
+      }
+    }
+
+    let renderTimer = null;
+    function scheduleRender() {
+      clearTimeout(renderTimer);
+      renderTimer = setTimeout(render, 120);
+    }
+
+    svgInput.addEventListener("input", scheduleRender);
+    sizesInput.addEventListener("input", scheduleRender);
+
+    btnRender.addEventListener("click", render);
+    btnExportAll.addEventListener("click", exportAll);
+    btnExportCurrent.addEventListener("click", exportSelected);
+
+    render();
+  </script>
+</body>
+</html>
