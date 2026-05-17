@@ -5,13 +5,11 @@ import path from 'node:path';
 import os from 'node:os';
 import { extractMeta, discoverTools, renderIndex, main } from '../lib.mjs';
 
-test('extractMeta pulls title and description from HTML', () => {
+test('extractMeta pulls title and description paragraph', () => {
   const html = `
     <!doctype html>
-    <html><head>
-      <title>Hello</title>
-      <meta name="description" content="A greeting">
-    </head></html>
+    <html><head><title>Hello</title></head>
+    <body><p class="description">A greeting</p></body></html>
   `;
   const meta = extractMeta(html);
   assert.equal(meta.title, 'Hello');
@@ -19,33 +17,41 @@ test('extractMeta pulls title and description from HTML', () => {
 });
 
 test('extractMeta trims whitespace around title', () => {
-  const html = `<title>  Spaced  </title><meta name="description" content="x">`;
+  const html = `<title>  Spaced  </title><p class="description">x</p>`;
   assert.equal(extractMeta(html).title, 'Spaced');
 });
 
 test('extractMeta throws when <title> is missing', () => {
-  const html = `<html><head><meta name="description" content="x"></head></html>`;
+  const html = `<html><body><p class="description">x</p></body></html>`;
   assert.throws(() => extractMeta(html), /missing.*title/i);
 });
 
-test('extractMeta throws when description meta is missing', () => {
+test('extractMeta throws when description paragraph is missing', () => {
   const html = `<html><head><title>Hi</title></head></html>`;
   assert.throws(() => extractMeta(html), /missing.*description/i);
 });
 
-test('extractMeta accepts single-quoted meta attributes', () => {
-  const html = `<title>X</title><meta name='description' content='y'>`;
+test('extractMeta accepts single-quoted class attribute', () => {
+  const html = `<title>X</title><p class='description'>y</p>`;
   assert.equal(extractMeta(html).description, 'y');
 });
 
-test('extractMeta accepts trailing attributes on description meta', () => {
-  const html = `<title>X</title><meta name="description" content="y" id="d">`;
+test('extractMeta accepts trailing attributes on description paragraph', () => {
+  const html = `<title>X</title><p class="description" id="d">y</p>`;
   assert.equal(extractMeta(html).description, 'y');
 });
 
-test('extractMeta accepts self-closing description meta', () => {
-  const html = `<title>X</title><meta name="description" content="z" />`;
-  assert.equal(extractMeta(html).description, 'z');
+test('extractMeta strips inline tags inside description', () => {
+  const html = `<title>X</title><p class="description">Has <em>emphasis</em> and <a href="/x">a link</a>.</p>`;
+  assert.equal(extractMeta(html).description, 'Has emphasis and a link.');
+});
+
+test('extractMeta collapses whitespace inside multi-line description', () => {
+  const html = `<title>X</title><p class="description">
+    Line one.
+    Line two.
+  </p>`;
+  assert.equal(extractMeta(html).description, 'Line one. Line two.');
 });
 
 function makeToolsDir() {
@@ -55,7 +61,7 @@ function makeToolsDir() {
 function writeTool(dir, slug, title, desc) {
   fs.writeFileSync(
     path.join(dir, `${slug}.html`),
-    `<title>${title}</title><meta name="description" content="${desc}">`
+    `<title>${title}</title><p class="description">${desc}</p>`
   );
 }
 
@@ -84,7 +90,7 @@ test('discoverTools skips non-html files', () => {
 test('discoverTools skips subdirectories', () => {
   const dir = makeToolsDir();
   fs.mkdirSync(path.join(dir, 'subfolder'));
-  fs.writeFileSync(path.join(dir, 'subfolder/index.html'), '<title>x</title><meta name="description" content="y">');
+  fs.writeFileSync(path.join(dir, 'subfolder/index.html'), '<title>x</title><p class="description">y</p>');
   writeTool(dir, 'real', 'Real', 'x');
 
   const tools = discoverTools(dir);
@@ -163,7 +169,7 @@ test('main builds dist with index, copied tools, and copied styles', () => {
   fs.mkdirSync(path.join(repoDir, 'tools'));
   fs.writeFileSync(
     path.join(repoDir, 'tools/foo.html'),
-    '<title>Foo</title><meta name="description" content="F"><body>foo</body>'
+    '<title>Foo</title><body><p class="description">F</p>foo</body>'
   );
 
   const distDir = path.join(repoDir, 'dist');

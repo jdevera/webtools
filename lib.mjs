@@ -2,16 +2,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const TITLE_RE = /<title>([^<]+)<\/title>/i;
-const DESC_RE = /<meta\s+name=["']description["']\s+content=["']([^"']+)["'][^>]*>/i;
+const DESC_RE = /<p\s+class=["']description["'][^>]*>([\s\S]*?)<\/p>/i;
 
 export function extractMeta(html) {
   const titleMatch = html.match(TITLE_RE);
   if (!titleMatch) throw new Error('missing <title>');
   const descMatch = html.match(DESC_RE);
-  if (!descMatch) throw new Error('missing <meta name="description">');
+  if (!descMatch) throw new Error('missing <p class="description">');
   return {
     title: titleMatch[1].trim(),
-    description: descMatch[1].trim(),
+    description: descMatch[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim(),
   };
 }
 
