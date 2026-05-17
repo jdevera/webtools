@@ -266,6 +266,15 @@
       display: none;
     }
 
+    .group.dropzone {
+      transition: border-color 120ms, background-color 120ms;
+    }
+    .group.dropzone.dragging {
+      border-color: var(--accent);
+      background: rgba(167,139,250,0.12);
+    }
+    .group.dropzone.dragging * { pointer-events: none; }
+
     @media (max-width: 980px) {
       .layout { grid-template-columns: 1fr; }
       .left { border-right: 0; border-bottom: 1px solid var(--border); }
@@ -283,9 +292,9 @@
 
   <div class="layout">
     <div class="left">
-      <div class="group">
+      <div class="group dropzone" id="svgGroup">
         <h2>SVG input</h2>
-        <label for="svgInput">SVG markup</label>
+        <label for="svgInput">SVG markup — or drop a .svg file anywhere in this panel</label>
         <textarea id="svgInput" spellcheck="false"></textarea>
         <div id="errorBox" class="errorBox"></div>
       </div>
@@ -697,6 +706,45 @@
     btnRender.addEventListener("click", render);
     btnExportAll.addEventListener("click", exportAll);
     btnExportCurrent.addEventListener("click", exportSelected);
+
+    const svgGroup = document.getElementById("svgGroup");
+    let dragCounter = 0;
+
+    svgGroup.addEventListener("dragenter", (e) => {
+      e.preventDefault();
+      dragCounter++;
+      svgGroup.classList.add("dragging");
+    });
+    svgGroup.addEventListener("dragover", (e) => {
+      e.preventDefault();
+    });
+    svgGroup.addEventListener("dragleave", () => {
+      dragCounter = Math.max(0, dragCounter - 1);
+      if (dragCounter === 0) svgGroup.classList.remove("dragging");
+    });
+    svgGroup.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      svgGroup.classList.remove("dragging");
+
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!file) return;
+
+      const isSvg = file.type === "image/svg+xml" || file.name.toLowerCase().endsWith(".svg");
+      if (!isSvg) {
+        showError(`Not an SVG file: ${file.name || "(unknown type)"}.`);
+        return;
+      }
+
+      try {
+        const text = await file.text();
+        svgInput.value = text;
+        render();
+        setStatus(`Loaded ${file.name}`);
+      } catch (err) {
+        showError(`Failed to read ${file.name}: ${err.message}`);
+      }
+    });
 
     render();
   </script>
