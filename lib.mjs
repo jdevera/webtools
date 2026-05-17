@@ -15,21 +15,27 @@ export function extractMeta(html) {
   };
 }
 
+const RESERVED_SLUGS = new Set(['index']);
+
 export function discoverTools(toolsDir) {
   const entries = fs.readdirSync(toolsDir, { withFileTypes: true });
   const tools = [];
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const indexPath = path.join(toolsDir, entry.name, 'index.html');
-    if (!fs.existsSync(indexPath)) continue;
-    const html = fs.readFileSync(indexPath, 'utf8');
+    if (!entry.isFile()) continue;
+    if (!entry.name.endsWith('.html')) continue;
+    const slug = entry.name.slice(0, -'.html'.length);
+    const filePath = path.join(toolsDir, entry.name);
+    if (RESERVED_SLUGS.has(slug) || slug.startsWith('_')) {
+      throw new Error(`${filePath}: slug "${slug}" is reserved`);
+    }
+    const html = fs.readFileSync(filePath, 'utf8');
     let meta;
     try {
       meta = extractMeta(html);
     } catch (e) {
-      throw new Error(`${indexPath}: ${e.message}`);
+      throw new Error(`${filePath}: ${e.message}`);
     }
-    tools.push({ slug: entry.name, title: meta.title, description: meta.description });
+    tools.push({ slug, title: meta.title, description: meta.description });
   }
   tools.sort((a, b) => a.title.localeCompare(b.title));
   return tools;
@@ -47,7 +53,7 @@ function escapeHtml(s) {
 
 export function renderIndex(template, tools) {
   const items = tools.map((t) =>
-    `<li><a href="/tools/${encodeURIComponent(t.slug)}/">` +
+    `<li><a href="/${encodeURIComponent(t.slug)}">` +
     `<strong>${escapeHtml(t.title)}</strong>` +
     `<small>${escapeHtml(t.description)}</small>` +
     `</a></li>`
@@ -86,7 +92,8 @@ export function main({ repoDir = process.cwd(), distDir = path.join(repoDir, 'di
     else fs.copyFileSync(s, d);
   }
 
-  if (fs.existsSync(toolsDir)) {
-    copyDir(toolsDir, path.join(distDir, 'tools'));
+  for (const tool of tools) {
+    const file = `${tool.slug}.html`;
+    fs.copyFileSync(path.join(toolsDir, file), path.join(distDir, file));
   }
 }

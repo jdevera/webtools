@@ -4,10 +4,12 @@ Tiny single-file browser tools, deployed by `git push` on Cloudflare Pages.
 
 ## Add a tool
 
-Create `tools/<slug>/index.html`. The file is self-contained — inline CSS and JS. It must include:
+Create `tools/<slug>.html`. The file is self-contained — inline CSS and JS. It must include:
 
 - `<title>` — display name on the index.
 - `<meta name="description" content="...">` — short blurb on the index.
+
+Cloudflare Pages serves it at `/<slug>` (the `.html` is stripped). Reserved slugs: `index` and anything starting with `_`.
 
 Commit and push. Cloudflare Pages builds and deploys automatically.
 

@@ -53,9 +53,8 @@ function makeToolsDir() {
 }
 
 function writeTool(dir, slug, title, desc) {
-  fs.mkdirSync(path.join(dir, slug), { recursive: true });
   fs.writeFileSync(
-    path.join(dir, slug, 'index.html'),
+    path.join(dir, `${slug}.html`),
     `<title>${title}</title><meta name="description" content="${desc}">`
   );
 }
@@ -72,9 +71,9 @@ test('discoverTools returns tools sorted by title', () => {
   ]);
 });
 
-test('discoverTools skips folders without index.html', () => {
+test('discoverTools skips non-html files', () => {
   const dir = makeToolsDir();
-  fs.mkdirSync(path.join(dir, 'empty-folder'));
+  fs.writeFileSync(path.join(dir, 'README.md'), '# notes');
   writeTool(dir, 'real', 'Real', 'x');
 
   const tools = discoverTools(dir);
@@ -82,23 +81,38 @@ test('discoverTools skips folders without index.html', () => {
   assert.equal(tools[0].slug, 'real');
 });
 
-test('discoverTools skips loose files at the top level', () => {
+test('discoverTools skips subdirectories', () => {
   const dir = makeToolsDir();
-  fs.writeFileSync(path.join(dir, 'README.md'), '# notes');
+  fs.mkdirSync(path.join(dir, 'subfolder'));
+  fs.writeFileSync(path.join(dir, 'subfolder/index.html'), '<title>x</title><meta name="description" content="y">');
   writeTool(dir, 'real', 'Real', 'x');
 
   const tools = discoverTools(dir);
   assert.equal(tools.length, 1);
+  assert.equal(tools[0].slug, 'real');
+});
+
+test('discoverTools rejects reserved slug "index"', () => {
+  const dir = makeToolsDir();
+  writeTool(dir, 'index', 'Bad', 'no');
+
+  assert.throws(() => discoverTools(dir), /reserved/i);
+});
+
+test('discoverTools rejects slugs starting with underscore', () => {
+  const dir = makeToolsDir();
+  writeTool(dir, '_secret', 'Bad', 'no');
+
+  assert.throws(() => discoverTools(dir), /reserved/i);
 });
 
 test('discoverTools error mentions the offending file path', () => {
   const dir = makeToolsDir();
-  fs.mkdirSync(path.join(dir, 'broken'));
-  fs.writeFileSync(path.join(dir, 'broken/index.html'), '<title>No description</title>');
+  fs.writeFileSync(path.join(dir, 'broken.html'), '<title>No description</title>');
 
   assert.throws(
     () => discoverTools(dir),
-    (err) => err.message.includes(path.join(dir, 'broken', 'index.html'))
+    (err) => err.message.includes(path.join(dir, 'broken.html'))
       && /description/i.test(err.message)
   );
 });
@@ -110,8 +124,8 @@ test('renderIndex replaces <!-- TOOLS --> with li items', () => {
     { slug: 'bravo', title: 'Bravo', description: 'Second' },
   ];
   const html = renderIndex(template, tools);
-  assert.match(html, /<a href="\/tools\/alpha\/">/);
-  assert.match(html, /<a href="\/tools\/bravo\/">/);
+  assert.match(html, /<a href="\/alpha">/);
+  assert.match(html, /<a href="\/bravo">/);
   assert.match(html, /<strong>Alpha<\/strong>/);
   assert.match(html, /First/);
   assert.ok(html.indexOf('alpha') < html.indexOf('bravo'), 'order from input is preserved');
@@ -146,25 +160,22 @@ test('main builds dist with index, copied tools, and copied styles', () => {
   );
   fs.writeFileSync(path.join(repoDir, '_index/style.css'), 'body{color:red}');
 
-  fs.mkdirSync(path.join(repoDir, 'tools/foo'), { recursive: true });
+  fs.mkdirSync(path.join(repoDir, 'tools'));
   fs.writeFileSync(
-    path.join(repoDir, 'tools/foo/index.html'),
+    path.join(repoDir, 'tools/foo.html'),
     '<title>Foo</title><meta name="description" content="F"><body>foo</body>'
   );
-  fs.mkdirSync(path.join(repoDir, 'tools/foo/assets'));
-  fs.writeFileSync(path.join(repoDir, 'tools/foo/assets/icon.svg'), '<svg/>');
 
   const distDir = path.join(repoDir, 'dist');
   main({ repoDir, distDir });
 
   assert.ok(fs.existsSync(path.join(distDir, 'index.html')), 'dist/index.html exists');
   assert.ok(fs.existsSync(path.join(distDir, '_index/style.css')), 'style.css copied');
-  assert.ok(fs.existsSync(path.join(distDir, 'tools/foo/index.html')), 'tool index copied');
-  assert.ok(fs.existsSync(path.join(distDir, 'tools/foo/assets/icon.svg')), 'tool subfile copied');
+  assert.ok(fs.existsSync(path.join(distDir, 'foo.html')), 'tool copied to dist root');
   assert.ok(!fs.existsSync(path.join(distDir, '_index/template.html')), 'template not copied');
 
   const indexHtml = fs.readFileSync(path.join(distDir, 'index.html'), 'utf8');
-  assert.match(indexHtml, /<a href="\/tools\/foo\/">/);
+  assert.match(indexHtml, /<a href="\/foo">/);
 });
 
 test('main wipes dist before building (stale files removed)', () => {
