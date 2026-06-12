@@ -1,0 +1,998 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Favicon Inspector</title>
+  <style>
+    :root {
+      --pad: 14px;
+      --gap: 12px;
+      --border: rgba(255,255,255,0.12);
+      --muted: rgba(255,255,255,0.7);
+      --bg: #0f111a;
+      --panel: #151827;
+      --panel2: #101322;
+      --text: #e6e6f0;
+      --accent: #A78BFA;
+      --ok: #34d399;
+      --bad: #f87171;
+      --warn: #fcd34d;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      padding: 18px 18px 10px 18px;
+      display: flex;
+      gap: 16px;
+      align-items: baseline;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 {
+      font-size: 16px;
+      margin: 0;
+      letter-spacing: 0.02em;
+      font-weight: 800;
+    }
+
+    header .description {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 0;
+    }
+
+    main { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+    .group {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(0,0,0,0.22);
+    }
+
+    .urlbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .urlbar input[type="text"] {
+      flex: 1;
+      min-width: 240px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 10px;
+      font-size: 13px;
+      outline: none;
+    }
+    .urlbar input[type="text"]:focus { border-color: rgba(167,139,250,0.55); }
+
+    /* before anything is inspected, the URL bar is the main event */
+    body:not(.loaded) .urlgroup {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 260px;
+      border-style: dashed;
+      border-width: 2px;
+      gap: 14px;
+    }
+    body:not(.loaded) .urlbar { width: 100%; max-width: 620px; }
+    body:not(.loaded) .urlhint { font-size: 14px; }
+    .urlhint { color: var(--muted); font-size: 12px; }
+
+    button {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:hover { border-color: rgba(255,255,255,0.22); }
+    button.primary {
+      background: rgba(167,139,250,0.18);
+      border-color: rgba(167,139,250,0.45);
+    }
+    button:disabled { opacity: 0.45; cursor: default; }
+
+    select {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 9px 8px;
+      font-size: 12px;
+    }
+
+    .status { font-size: 12px; color: var(--muted); min-height: 16px; }
+
+    .errorBox {
+      border: 1px solid rgba(248,113,113,0.45);
+      background: rgba(248,113,113,0.10);
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      display: none;
+    }
+
+    section.method { display: none; }
+    body.loaded section.method { display: block; }
+
+    .mhead { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .mhead h2 {
+      font-size: 12px;
+      margin: 0;
+      color: var(--muted);
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    .mdesc { color: var(--muted); font-size: 12px; margin: 6px 0 0 0; }
+    .mnote { color: var(--muted); font-size: 12px; margin: 6px 0 0 0; display: none; }
+
+    .chip {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.06);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .chip.ok { border-color: rgba(52,211,153,0.5); color: var(--ok); }
+    .chip.bad { border-color: rgba(248,113,113,0.5); color: var(--bad); }
+    .chip.warn { border-color: rgba(252,211,77,0.5); color: var(--warn); }
+    .chip.dim { color: var(--muted); }
+    .chip b { color: var(--accent); font-weight: 700; }
+    .swatch {
+      display: inline-block;
+      width: 11px;
+      height: 11px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      vertical-align: -1px;
+      margin-right: 5px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .cards:empty { display: none; }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      padding: 12px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .preview {
+      width: 96px;
+      height: 96px;
+      flex: none;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: repeating-conic-gradient(rgba(255,255,255,0.10) 0% 25%, rgba(0,0,0,0.20) 0% 50%) 0 0 / 16px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 11px;
+      text-align: center;
+    }
+    .preview img { image-rendering: pixelated; }
+    .preview img.smooth { image-rendering: auto; }
+
+    .cardbody { display: flex; flex-direction: column; gap: 7px; min-width: 0; flex: 1; }
+
+    code.snippet {
+      display: block;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      color: rgba(255,255,255,0.85);
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 8px;
+      max-height: 72px;
+      overflow: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    a.iconurl {
+      color: var(--accent);
+      font-size: 11px;
+      overflow-wrap: anywhere;
+      text-decoration: none;
+    }
+    a.iconurl:hover { text-decoration: underline; }
+
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    .dl { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .dl button { padding: 7px 10px; font-size: 12px; }
+
+    .cardnote { font-size: 11px; color: var(--muted); }
+    .cardnote.err { color: var(--bad); }
+
+    .misses { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+    .misses:empty { display: none; }
+    .miss {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    .miss::before { content: "✕ "; color: var(--bad); }
+
+    @media (max-width: 560px) {
+      .cards { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Favicon Inspector</h1>
+    <p class="description">Inspect a website&rsquo;s favicons: every way a site can declare them (icon link tags, apple-touch-icon, mask-icon, web app manifest, Microsoft tiles, well-known paths) plus what Google&rsquo;s and DuckDuckGo&rsquo;s favicon services return. Shows how each icon was found, its real format and size, and downloads any of them as PNG.</p>
+  </header>
+
+  <main>
+    <div class="group urlgroup">
+      <div class="urlbar">
+        <input type="text" id="urlInput" placeholder="example.com or https://example.com/page" spellcheck="false" autocapitalize="off" autocorrect="off" />
+        <button class="primary" id="btnInspect">Inspect</button>
+      </div>
+      <span class="urlhint">Cross-origin pages are fetched through public CORS proxies (corsproxy.io, allorigins.win) &mdash; the proxy sees the URL you inspect. You can also link here with <code>?url=&hellip;</code></span>
+      <span class="status" id="status"></span>
+    </div>
+
+    <div class="errorBox" id="errorBox"></div>
+
+    <div id="sections"></div>
+  </main>
+
+  <script>
+    "use strict";
+
+    // ---------- helpers ----------
+
+    const $ = id => document.getElementById(id);
+
+    function el(tag, className, text) {
+      const e = document.createElement(tag);
+      if (className) e.className = className;
+      if (text !== undefined) e.textContent = text;
+      return e;
+    }
+
+    function fmtBytes(n) {
+      if (!Number.isFinite(n)) return "?";
+      const units = ["B", "KB", "MB"];
+      let i = 0, v = n;
+      while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+      return (i === 0 ? String(v) : v.toFixed(1)) + " " + units[i];
+    }
+
+    function normalizeUrl(raw) {
+      raw = (raw || "").trim();
+      if (!raw) throw new Error("Enter a URL to inspect.");
+      if (!/^[a-z][a-z0-9+.-]*:/i.test(raw)) raw = "https://" + raw;
+      let u;
+      try { u = new URL(raw); } catch { throw new Error("That does not look like a valid URL."); }
+      if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error("Only http(s) URLs are supported.");
+      return u;
+    }
+
+    // ---------- fetching through CORS proxies ----------
+
+    // Free public CORS proxies come and go: corsproxy.io is free on localhost
+    // but needs an API key on deployed origins; allorigins has outages.
+    // Keep trying them all in order — failures are fast (an HTTP error, not a
+    // timeout) and any one working is enough.
+    const PROXIES = [
+      { name: "direct", wrap: u => u },
+      { name: "allorigins.win", wrap: u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u) },
+      { name: "corsproxy.io", wrap: u => "https://corsproxy.io/?url=" + encodeURIComponent(u) },
+      { name: "cors.eu.org", wrap: u => "https://cors.eu.org/" + u },
+    ];
+    let preferredProxy = 0;
+
+    async function fetchTimeout(url) {
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 12000);
+      try { return await fetch(url, { signal: ctl.signal, redirect: "follow" }); }
+      finally { clearTimeout(t); }
+    }
+
+    // Try the last route that worked first, then the rest in order.
+    // An HTTP error status is passed through proxies, so it is a real answer
+    // for the target URL — but a proxy can also produce its own 403/429, so we
+    // still try the remaining routes before settling on it.
+    async function fetchVia(url) {
+      const order = [preferredProxy, ...PROXIES.keys()].filter((v, i, a) => a.indexOf(v) === i);
+      let httpErr = null;
+      for (const i of order) {
+        const p = PROXIES[i];
+        try {
+          const res = await fetchTimeout(p.wrap(url));
+          if (!res.ok) {
+            if (!httpErr) httpErr = new Error("HTTP " + res.status + (i ? " (via " + p.name + ")" : ""));
+            continue;
+          }
+          preferredProxy = i;
+          return { res, via: p.name };
+        } catch { /* CORS block, network error or timeout — try next route */ }
+      }
+      throw httpErr || new Error("unreachable — direct fetch blocked by CORS and all public proxies failed (they are rate-limited free services; try again later)");
+    }
+
+    // ---------- format sniffing & parsing ----------
+
+    const FORMATS = {
+      ico:  { label: "ICO",  ext: "ico",  mime: "image/x-icon" },
+      cur:  { label: "CUR",  ext: "cur",  mime: "image/x-icon" },
+      png:  { label: "PNG",  ext: "png",  mime: "image/png" },
+      jpeg: { label: "JPEG", ext: "jpg",  mime: "image/jpeg" },
+      gif:  { label: "GIF",  ext: "gif",  mime: "image/gif" },
+      webp: { label: "WebP", ext: "webp", mime: "image/webp" },
+      avif: { label: "AVIF", ext: "avif", mime: "image/avif" },
+      bmp:  { label: "BMP",  ext: "bmp",  mime: "image/bmp" },
+      svg:  { label: "SVG",  ext: "svg",  mime: "image/svg+xml" },
+    };
+
+    function sniffFormat(bytes) {
+      const b = bytes;
+      if (b.length >= 4 && b[0] === 0 && b[1] === 0 && b[2] === 1 && b[3] === 0) return "ico";
+      if (b.length >= 4 && b[0] === 0 && b[1] === 0 && b[2] === 2 && b[3] === 0) return "cur";
+      if (b.length >= 4 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return "png";
+      if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "jpeg";
+      if (b.length >= 4 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return "gif";
+      if (b.length >= 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+          b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return "webp";
+      if (b.length >= 12 && b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70 &&
+          b[8] === 0x61 && b[9] === 0x76 && b[10] === 0x69 && b[11] === 0x66) return "avif";
+      if (b.length >= 2 && b[0] === 0x42 && b[1] === 0x4d) return "bmp";
+      const head = new TextDecoder("utf-8", { fatal: false }).decode(b.subarray(0, 1024)).trimStart();
+      if (/^(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*(<!DOCTYPE svg[^>]*>\s*)?<svg[\s>]/i.test(head)) return "svg";
+      return null;
+    }
+
+    function looksLikeHtml(bytes) {
+      const head = new TextDecoder("utf-8", { fatal: false }).decode(bytes.subarray(0, 512)).trimStart().toLowerCase();
+      return head.startsWith("<!doctype html") || head.startsWith("<html") || head.includes("<head") || head.includes("<body");
+    }
+
+    function parseIcoEntries(bytes) {
+      if (bytes.length < 6) return null;
+      const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      const count = dv.getUint16(4, true);
+      if (!count || count > 64) return null;
+      const entries = [];
+      for (let i = 0; i < count; i++) {
+        const off = 6 + i * 16;
+        if (off + 16 > bytes.length) break;
+        const w = bytes[off] || 256;
+        const h = bytes[off + 1] || 256;
+        const bpp = dv.getUint16(off + 6, true);
+        const imgOff = dv.getUint32(off + 12, true);
+        const isPng = imgOff + 4 <= bytes.length &&
+          bytes[imgOff] === 0x89 && bytes[imgOff + 1] === 0x50 && bytes[imgOff + 2] === 0x4e && bytes[imgOff + 3] === 0x47;
+        entries.push({ w, h, bpp, isPng });
+      }
+      return entries.length ? entries : null;
+    }
+
+    function svgRoot(text) {
+      const doc = new DOMParser().parseFromString(text, "image/svg+xml");
+      const root = doc.documentElement;
+      return root && root.nodeName.toLowerCase() === "svg" ? root : null;
+    }
+
+    function svgDims(text) {
+      try {
+        const root = svgRoot(text);
+        if (!root) return null;
+        const w = parseFloat(root.getAttribute("width")), h = parseFloat(root.getAttribute("height"));
+        if (w > 0 && h > 0) return { w: Math.round(w), h: Math.round(h) };
+        const vb = (root.getAttribute("viewBox") || "").trim().split(/[\s,]+/).map(Number);
+        if (vb.length === 4 && vb[2] > 0 && vb[3] > 0) return { w: Math.round(vb[2]), h: Math.round(vb[3]), fromViewBox: true };
+      } catch { /* malformed svg */ }
+      return null;
+    }
+
+    function svgWithSize(text, size) {
+      try {
+        const root = svgRoot(text);
+        if (!root) return text;
+        if (!root.getAttribute("viewBox")) {
+          const w = parseFloat(root.getAttribute("width")), h = parseFloat(root.getAttribute("height"));
+          if (w > 0 && h > 0) root.setAttribute("viewBox", "0 0 " + w + " " + h);
+        }
+        root.setAttribute("width", String(size));
+        root.setAttribute("height", String(size));
+        return new XMLSerializer().serializeToString(root);
+      } catch { return text; }
+    }
+
+    function loadImage(url) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("the browser could not decode this image"));
+        img.src = url;
+      });
+    }
+
+    // ---------- icon analysis (fetch + identify), cached per URL ----------
+
+    const iconCache = new Map();
+
+    function analyzeIcon(url) {
+      if (!iconCache.has(url)) iconCache.set(url, doAnalyzeIcon(url));
+      return iconCache.get(url);
+    }
+
+    async function doAnalyzeIcon(url) {
+      const { res, via } = await fetchVia(url);
+      const buf = await res.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      if (!bytes.length) throw new Error("empty response");
+      const fmtId = sniffFormat(bytes);
+      if (!fmtId) {
+        throw new Error(looksLikeHtml(bytes)
+          ? "not an image — the server returned an HTML page (soft 404?)"
+          : "not a recognized image format");
+      }
+      const format = FORMATS[fmtId];
+      const blob = new Blob([buf], { type: format.mime });
+      const objUrl = URL.createObjectURL(blob);
+      let dims = null, icoEntries = null, svgText = null;
+      if (fmtId === "ico" || fmtId === "cur") icoEntries = parseIcoEntries(bytes);
+      if (fmtId === "svg") {
+        svgText = new TextDecoder().decode(bytes);
+        dims = svgDims(svgText);
+      }
+      if (!dims) {
+        try {
+          const img = await loadImage(objUrl);
+          if (img.naturalWidth) dims = { w: img.naturalWidth, h: img.naturalHeight };
+        } catch { /* sniffed ok but undecodable; card still shows format/bytes */ }
+      }
+      return { url, via, fmtId, format, blob, objUrl, dims, icoEntries, svgText, byteSize: bytes.length };
+    }
+
+    // ---------- PNG conversion & downloads ----------
+
+    async function toPngBlob(item, size) {
+      let img, cw, ch, dx, dy, dw, dh;
+      let tempUrl = null;
+      try {
+        if (item.fmtId === "svg") {
+          const target = size || (item.dims && item.dims.w) || 512;
+          tempUrl = URL.createObjectURL(new Blob([svgWithSize(item.svgText, target)], { type: "image/svg+xml" }));
+          img = await loadImage(tempUrl);
+          cw = ch = dw = dh = target;
+          dx = dy = 0;
+        } else {
+          img = await loadImage(item.objUrl);
+          const w = img.naturalWidth, h = img.naturalHeight;
+          if (!w || !h) throw new Error("the browser could not decode this image");
+          if (!size) {
+            cw = dw = w; ch = dh = h; dx = dy = 0;
+          } else {
+            cw = ch = size;
+            const s = Math.min(size / w, size / h);
+            dw = Math.max(1, Math.round(w * s));
+            dh = Math.max(1, Math.round(h * s));
+            dx = Math.round((size - dw) / 2);
+            dy = Math.round((size - dh) / 2);
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = cw;
+        canvas.height = ch;
+        canvas.getContext("2d").drawImage(img, dx, dy, dw, dh);
+        return await new Promise((resolve, reject) =>
+          canvas.toBlob(b => b ? resolve(b) : reject(new Error("PNG encoding failed")), "image/png"));
+      } finally {
+        if (tempUrl) URL.revokeObjectURL(tempUrl);
+      }
+    }
+
+    function saveBlob(blob, filename) {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    }
+
+    function fileStem(host, cand) {
+      const stem = (host + "-" + cand.slug).replace(/[^a-z0-9.-]+/gi, "-").replace(/-+/g, "-");
+      return stem.replace(/^-|-$/g, "");
+    }
+
+    // ---------- discovery: parse the page HTML ----------
+
+    function emptyCollected() {
+      return { icon: [], shortcut: [], apple: [], mask: [], fluid: [], manifestLink: null, msMeta: [], msConfig: undefined, msTileColor: null };
+    }
+
+    function collectFromDoc(doc, pageHref) {
+      const out = emptyCollected();
+      let base = pageHref;
+      const baseEl = doc.querySelector("base[href]");
+      if (baseEl) {
+        try { base = new URL(baseEl.getAttribute("href"), pageHref).href; } catch { /* keep page url */ }
+      }
+      const resolve = href => {
+        try { return new URL(href, base).href; } catch { return null; }
+      };
+
+      for (const link of doc.querySelectorAll("link[rel]")) {
+        const tokens = (link.getAttribute("rel") || "").toLowerCase().trim().split(/\s+/);
+        const href = link.getAttribute("href");
+        const cand = extra => ({
+          url: href ? resolve(href) : null,
+          snippet: link.outerHTML,
+          sizes: link.getAttribute("sizes"),
+          type: link.getAttribute("type"),
+          ...extra,
+        });
+        if (tokens.includes("icon") && tokens.includes("shortcut")) out.shortcut.push(cand({ slug: "shortcut-icon" }));
+        else if (tokens.includes("icon")) out.icon.push(cand({ slug: "icon" }));
+        if (tokens.includes("apple-touch-icon")) out.apple.push(cand({ slug: "apple-touch-icon" }));
+        if (tokens.includes("apple-touch-icon-precomposed")) out.apple.push(cand({ slug: "apple-touch-icon-precomposed", note: "precomposed (pre-iOS 7 variant: no gloss effect added)" }));
+        if (tokens.includes("mask-icon")) out.mask.push(cand({ slug: "mask-icon", color: link.getAttribute("color") }));
+        if (tokens.includes("fluid-icon")) out.fluid.push(cand({ slug: "fluid-icon" }));
+        if (tokens.includes("manifest") && href) out.manifestLink = { url: resolve(href), snippet: link.outerHTML };
+      }
+
+      for (const meta of doc.querySelectorAll("meta[name]")) {
+        const name = (meta.getAttribute("name") || "").toLowerCase();
+        const content = meta.getAttribute("content");
+        if (name === "msapplication-tileimage") {
+          out.msMeta.push({ url: content ? resolve(content) : null, snippet: meta.outerHTML, slug: "mstile" });
+        } else if (name === "msapplication-config") {
+          out.msConfig = { value: content, snippet: meta.outerHTML };
+        } else if (name === "msapplication-tilecolor") {
+          out.msTileColor = content;
+        }
+      }
+      return out;
+    }
+
+    // ---------- sections & cards ----------
+
+    const METHODS = [
+      { id: "icon", title: '<link rel="icon">', desc: "The standard declaration: one or more link tags in the HTML head, optionally with sizes and type attributes.", none: "not declared" },
+      { id: "shortcut", title: '<link rel="shortcut icon">', desc: "Legacy IE-era spelling; redundant with rel=\"icon\" but still common.", none: "not declared" },
+      { id: "apple", title: '<link rel="apple-touch-icon">', desc: "Home-screen icon for iOS/iPadOS (and used by Android and others as a high-res fallback).", none: "not declared" },
+      { id: "mask", title: '<link rel="mask-icon">', desc: "Safari pinned-tab icon: a monochrome SVG mask plus a color attribute.", none: "not declared" },
+      { id: "fluid", title: '<link rel="fluid-icon">', desc: "Rare: icon for the Fluid.app site-specific browser on macOS.", none: "not declared" },
+      { id: "manifest", title: "Web app manifest", desc: "A <link rel=\"manifest\"> points at a JSON file whose icons[] array lists PWA install icons.", none: "no manifest declared" },
+      { id: "mstile", title: "Microsoft tiles", desc: "msapplication-TileImage meta tags and browserconfig.xml tile logos, used by old IE/Edge for Start-screen pins. When nothing is declared, IE probed /browserconfig.xml by default — this tool probes it too.", none: "nothing declared" },
+      { id: "wellknown", title: "Well-known paths", desc: "Paths browsers request even when nothing is declared in the HTML.", none: "" },
+      { id: "services", title: "Third-party favicon services", desc: "What Google's and DuckDuckGo's favicon APIs serve for this host. These load without a proxy, so they work even when everything above fails.", none: "" },
+    ];
+
+    function makeSection(method) {
+      const root = el("section", "group method");
+      const head = el("div", "mhead");
+      head.appendChild(el("h2", null, method.title));
+      const statusEl = el("span", "chip dim", "checking…");
+      head.appendChild(statusEl);
+      root.appendChild(head);
+      root.appendChild(el("p", "mdesc", method.desc));
+      const noteEl = el("p", "mnote");
+      root.appendChild(noteEl);
+      const cardsEl = el("div", "cards");
+      root.appendChild(cardsEl);
+      const missesEl = el("div", "misses");
+      root.appendChild(missesEl);
+      $("sections").appendChild(root);
+      return { method, root, statusEl, noteEl, cardsEl, missesEl };
+    }
+
+    function setSectionNote(sec, text) {
+      sec.noteEl.textContent = text;
+      sec.noteEl.style.display = text ? "block" : "none";
+    }
+
+    function setSectionStatus(sec, text, kind) {
+      sec.statusEl.textContent = text;
+      sec.statusEl.className = "chip " + (kind || "dim");
+    }
+
+    function finishSection(sec, results) {
+      const ok = results.filter(r => r && r.ok).length;
+      const failed = results.filter(r => r && !r.ok && !r.miss).length;
+      const missed = results.filter(r => r && r.miss).length;
+      if (!results.length) { setSectionStatus(sec, sec.method.none || "nothing to check", "dim"); return; }
+      const parts = [];
+      if (ok) parts.push(ok + " found");
+      if (failed) parts.push(failed + " failed");
+      if (missed) parts.push(missed + " not present");
+      setSectionStatus(sec, parts.join(", ") || "none", ok ? "ok" : (failed ? "bad" : "dim"));
+    }
+
+    function addChipTo(parent, text, kind, swatchColor) {
+      const c = el("span", "chip" + (kind ? " " + kind : ""));
+      if (swatchColor) {
+        const s = el("span", "swatch");
+        s.style.background = swatchColor;
+        c.appendChild(s);
+      }
+      c.appendChild(document.createTextNode(text));
+      parent.appendChild(c);
+      return c;
+    }
+
+    function addMiss(sec, label, reason) {
+      sec.missesEl.appendChild(el("div", "miss", label + " — " + reason));
+    }
+
+    // Map of resolved URL → how it was declared, to flag duplicates found by probing.
+    const declaredVia = new Map();
+
+    function cardScaffold(sec, cand) {
+      const card = el("div", "card");
+      const preview = el("div", "preview", "loading…");
+      card.appendChild(preview);
+      const body = el("div", "cardbody");
+      if (cand.snippet) body.appendChild(el("code", "snippet", cand.snippet));
+      else if (cand.label) body.appendChild(el("code", "snippet", cand.label));
+      if (cand.url) {
+        const a = el("a", "iconurl", cand.url);
+        a.href = cand.url;
+        a.target = "_blank";
+        a.rel = "noopener";
+        body.appendChild(a);
+      }
+      card.appendChild(body);
+      sec.cardsEl.appendChild(card);
+      return { card, preview, body };
+    }
+
+    function renderCardOk(parts, cand, item, host) {
+      const { preview, body } = parts;
+
+      preview.replaceChildren();
+      const img = document.createElement("img");
+      img.src = item.objUrl;
+      img.alt = "";
+      const nat = item.dims ? Math.max(item.dims.w, item.dims.h) : 64;
+      let disp;
+      if (item.fmtId === "svg") { disp = 80; img.className = "smooth"; }
+      else if (nat <= 32) disp = nat * Math.max(2, Math.floor(64 / nat));
+      else disp = Math.min(nat, 88);
+      img.style.width = disp + "px";
+      preview.appendChild(img);
+
+      const chips = el("div", "chips");
+      addChipTo(chips, item.format.label + (item.fmtId === "svg" && cand.color !== undefined ? " mask" : ""));
+      if (item.dims) {
+        addChipTo(chips, item.dims.w + "×" + item.dims.h + (item.dims.fromViewBox ? " (viewBox)" : "") + " px");
+      }
+      if (cand.sizes) {
+        const matches = !item.dims || cand.sizes.toLowerCase() === "any" ||
+          cand.sizes.toLowerCase().split(/\s+/).includes(item.dims.w + "x" + item.dims.h);
+        addChipTo(chips, 'declared sizes="' + cand.sizes + '"', matches ? null : "warn");
+      }
+      if (cand.type && cand.type.toLowerCase() !== item.format.mime) {
+        const harmless = cand.type.toLowerCase() === "image/vnd.microsoft.icon" && item.format.mime === "image/x-icon";
+        if (!harmless) addChipTo(chips, 'declared type="' + cand.type + '"', "warn");
+      }
+      addChipTo(chips, fmtBytes(item.byteSize));
+      if (item.icoEntries) {
+        addChipTo(chips, "contains: " + item.icoEntries.map(e => e.w + "×" + e.h + (e.isPng ? " png" : " @" + e.bpp + "bpp")).join(", "));
+      }
+      if (cand.color) addChipTo(chips, "color " + cand.color, null, cand.color);
+      if (item.via !== "direct") addChipTo(chips, "via " + item.via, "dim");
+      parts.body.appendChild(chips);
+
+      const dl = el("div", "dl");
+      const btnOrig = el("button", null, "Original ." + item.format.ext);
+      btnOrig.addEventListener("click", () => saveBlob(item.blob, fileStem(host, cand) + "." + item.format.ext));
+      dl.appendChild(btnOrig);
+      const sel = document.createElement("select");
+      for (const s of ["native", "16", "32", "48", "64", "128", "256", "512"]) {
+        const o = document.createElement("option");
+        o.value = s === "native" ? "" : s;
+        o.textContent = s === "native" ? "native size" : s + "×" + s;
+        sel.appendChild(o);
+      }
+      dl.appendChild(sel);
+      const btnPng = el("button", "primary", "PNG");
+      const note = el("div", "cardnote");
+      btnPng.addEventListener("click", async () => {
+        note.className = "cardnote";
+        note.textContent = "converting…";
+        try {
+          const size = sel.value ? parseInt(sel.value, 10) : 0;
+          const blob = await toPngBlob(item, size);
+          saveBlob(blob, fileStem(host, cand) + (size ? "-" + size : "") + ".png");
+          note.textContent = "";
+        } catch (err) {
+          note.className = "cardnote err";
+          note.textContent = "PNG conversion failed: " + err.message;
+        }
+      });
+      dl.appendChild(btnPng);
+      body.appendChild(dl);
+      body.appendChild(note);
+
+      const notes = [];
+      if (cand.note) notes.push(cand.note);
+      const dup = declaredVia.get(item.url);
+      if (dup && cand.probed) notes.push("same URL is also declared via " + dup);
+      if (notes.length) body.appendChild(el("div", "cardnote", notes.join(" · ")));
+    }
+
+    function renderCardError(parts, cand, message) {
+      const { preview, body } = parts;
+      preview.textContent = "unavailable";
+      if (cand.url) {
+        // bytes were unreachable, but a plain <img> is exempt from CORS — it
+        // may still display (conversion stays impossible: tainted canvas).
+        const img = document.createElement("img");
+        img.alt = "";
+        img.style.maxWidth = "88px";
+        img.style.maxHeight = "88px";
+        img.onload = () => { preview.replaceChildren(img); };
+        img.src = cand.url;
+      }
+      const note = el("div", "cardnote err", message);
+      body.appendChild(note);
+    }
+
+    async function addIconCard(sec, cand, host, opts = {}) {
+      if (!cand.url) {
+        const parts = cardScaffold(sec, cand);
+        renderCardError(parts, cand, "missing or unresolvable URL in the declaration");
+        return { ok: false };
+      }
+      const parts = cardScaffold(sec, cand);
+      try {
+        const item = await analyzeIcon(cand.url);
+        renderCardOk(parts, cand, item, host);
+        return { ok: true };
+      } catch (err) {
+        if (opts.compactMiss) {
+          parts.card.remove();
+          addMiss(sec, cand.label || cand.url, err.message);
+          return { ok: false, miss: true };
+        }
+        renderCardError(parts, cand, err.message);
+        return { ok: false };
+      }
+    }
+
+    // ---------- per-method runners ----------
+
+    async function runLinkSection(sec, cands, host, htmlOk) {
+      if (!htmlOk) { setSectionStatus(sec, "unknown — HTML unavailable", "bad"); return; }
+      const results = await Promise.all(cands.map(c => addIconCard(sec, c, host)));
+      finishSection(sec, results);
+    }
+
+    async function runManifest(sec, link, host, htmlOk) {
+      if (!htmlOk) { setSectionStatus(sec, "unknown — HTML unavailable", "bad"); return; }
+      if (!link || !link.url) { setSectionStatus(sec, sec.method.none, "dim"); return; }
+      setSectionNote(sec, "manifest: " + link.url);
+      let json;
+      try {
+        const { res } = await fetchVia(link.url);
+        json = await res.json();
+      } catch (err) {
+        setSectionStatus(sec, "manifest fetch failed: " + err.message, "bad");
+        return;
+      }
+      const icons = Array.isArray(json.icons) ? json.icons : [];
+      if (!icons.length) { setSectionStatus(sec, "manifest has no icons[]", "dim"); return; }
+      const cands = icons.map((ic, i) => {
+        let url = null;
+        try { url = ic.src ? new URL(ic.src, link.url).href : null; } catch { /* unresolvable src */ }
+        return {
+          url,
+          snippet: JSON.stringify(ic, null, 1),
+          sizes: ic.sizes,
+          type: ic.type,
+          note: ic.purpose ? 'purpose="' + ic.purpose + '"' : null,
+          slug: "manifest-icon-" + i,
+        };
+      });
+      const results = await Promise.all(cands.map(c => addIconCard(sec, c, host)));
+      finishSection(sec, results);
+    }
+
+    async function runMsTiles(sec, col, origin, pageHref, host, htmlOk) {
+      const results = [];
+      const noteBits = [];
+      if (col.msTileColor) noteBits.push("msapplication-TileColor: " + col.msTileColor);
+
+      if (htmlOk) {
+        for (const m of col.msMeta) results.push(await addIconCard(sec, m, host));
+      }
+
+      let cfgUrl = null, probed = false;
+      const cfgValue = col.msConfig && (col.msConfig.value || "").trim();
+      if (col.msConfig && cfgValue && cfgValue.toLowerCase() === "none") {
+        noteBits.push('msapplication-config="none" — browserconfig probing explicitly disabled');
+      } else if (col.msConfig && cfgValue) {
+        try { cfgUrl = new URL(cfgValue, pageHref).href; } catch { noteBits.push("msapplication-config has an unresolvable URL"); }
+      } else if (!col.msConfig) {
+        cfgUrl = origin + "/browserconfig.xml";
+        probed = true;
+      }
+
+      if (cfgUrl) {
+        try {
+          const { res } = await fetchVia(cfgUrl);
+          const text = await res.text();
+          const xml = new DOMParser().parseFromString(text, "text/xml");
+          if (xml.querySelector("parsererror")) throw new Error("not valid XML" + (looksLikeHtml(new TextEncoder().encode(text)) ? " (got an HTML page)" : ""));
+          const logos = xml.querySelectorAll("square70x70logo, square150x150logo, wide310x150logo, square310x310logo");
+          noteBits.push((probed ? "probed default " : "") + "browserconfig: " + cfgUrl);
+          const color = xml.querySelector("TileColor");
+          if (color) noteBits.push("TileColor: " + color.textContent.trim());
+          if (!logos.length) {
+            addMiss(sec, cfgUrl, "browserconfig.xml found but declares no tile logos");
+          }
+          for (const logo of logos) {
+            let url = null;
+            try { url = new URL(logo.getAttribute("src") || "", cfgUrl).href; } catch { /* unresolvable */ }
+            const div = document.createElement("div");
+            div.appendChild(logo.cloneNode(true));
+            results.push(await addIconCard(sec, {
+              url,
+              snippet: div.innerHTML,
+              slug: logo.nodeName.toLowerCase(),
+              note: probed ? "from probed /browserconfig.xml" : "from browserconfig.xml",
+            }, host));
+          }
+        } catch (err) {
+          if (probed) addMiss(sec, "/browserconfig.xml", err.message);
+          else { setSectionNote(sec, noteBits.join(" · ")); setSectionStatus(sec, "browserconfig fetch failed: " + err.message, "bad"); return; }
+        }
+      }
+
+      setSectionNote(sec, noteBits.join(" · "));
+      if (!htmlOk && !results.length) { setSectionStatus(sec, "HTML unavailable; only probed /browserconfig.xml", "bad"); return; }
+      finishSection(sec, results);
+    }
+
+    async function runWellKnown(sec, origin, host) {
+      const paths = ["/favicon.ico", "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png"];
+      const results = await Promise.all(paths.map(p => addIconCard(sec, {
+        url: origin + p,
+        label: "probed " + p,
+        slug: p.replace(/^\//, "").replace(/\.\w+$/, ""),
+        probed: true,
+      }, host, { compactMiss: true })));
+      finishSection(sec, results);
+    }
+
+    async function runServices(sec, host) {
+      const cands = [];
+      for (const sz of [16, 32, 64, 128, 256]) {
+        cands.push({
+          url: "https://www.google.com/s2/favicons?domain=" + encodeURIComponent(host) + "&sz=" + sz,
+          label: "Google favicon service, requested size " + sz + " (serves a default globe when it has nothing)",
+          slug: "google-s2-" + sz,
+        });
+      }
+      cands.push({
+        url: "https://icons.duckduckgo.com/ip3/" + encodeURIComponent(host) + ".ico",
+        label: "DuckDuckGo icon service",
+        slug: "duckduckgo",
+      });
+      const results = await Promise.all(cands.map(c => addIconCard(sec, c, host)));
+      finishSection(sec, results);
+    }
+
+    // ---------- orchestration ----------
+
+    const statusEl = $("status"), errorBox = $("errorBox"), urlInput = $("urlInput");
+    let running = false;
+
+    function setStatus(msg) { statusEl.textContent = msg || ""; }
+
+    function showError(msg) {
+      errorBox.style.display = msg ? "block" : "none";
+      errorBox.textContent = msg || "";
+    }
+
+    async function inspect(raw) {
+      if (running) return;
+      let url;
+      try { url = normalizeUrl(raw); } catch (err) { showError(err.message); return; }
+
+      running = true;
+      $("btnInspect").disabled = true;
+      showError("");
+      $("sections").replaceChildren();
+      iconCache.clear();
+      declaredVia.clear();
+      preferredProxy = 0;
+      document.body.classList.add("loaded");
+
+      const host = url.host;
+      history.replaceState(null, "", "?url=" + encodeURIComponent(urlInput.value.trim()));
+      setStatus("fetching " + url.href + " …");
+
+      const sections = {};
+      for (const m of METHODS) sections[m.id] = makeSection(m);
+
+      // Third-party services don't depend on the page HTML — start right away.
+      const tasks = [runServices(sections.services, host)];
+
+      let htmlOk = false;
+      let collected = emptyCollected();
+      try {
+        const { res, via } = await fetchVia(url.href);
+        const text = await res.text();
+        collected = collectFromDoc(new DOMParser().parseFromString(text, "text/html"), url.href);
+        htmlOk = true;
+        setStatus("HTML fetched " + (via === "direct" ? "directly" : "via " + via) + " (" + fmtBytes(text.length) + ") — checking icons…");
+      } catch (err) {
+        showError("Could not fetch the page HTML: " + err.message + ". Icons declared in the HTML cannot be discovered, but the well-known paths and third-party services below were still checked.");
+        setStatus("");
+      }
+
+      for (const [methodId, cands] of [["icon", collected.icon], ["shortcut", collected.shortcut], ["apple", collected.apple], ["mask", collected.mask], ["fluid", collected.fluid]]) {
+        for (const c of cands) {
+          if (c.url && !declaredVia.has(c.url)) declaredVia.set(c.url, METHODS.find(m => m.id === methodId).title);
+        }
+      }
+
+      tasks.push(
+        runLinkSection(sections.icon, collected.icon, host, htmlOk),
+        runLinkSection(sections.shortcut, collected.shortcut, host, htmlOk),
+        runLinkSection(sections.apple, collected.apple, host, htmlOk),
+        runLinkSection(sections.mask, collected.mask, host, htmlOk),
+        runLinkSection(sections.fluid, collected.fluid, host, htmlOk),
+        runManifest(sections.manifest, collected.manifestLink, host, htmlOk),
+        runMsTiles(sections.mstile, collected, url.origin, url.href, host, htmlOk),
+        runWellKnown(sections.wellknown, url.origin, host),
+      );
+
+      await Promise.allSettled(tasks);
+      if (htmlOk) setStatus("done — " + host);
+      running = false;
+      $("btnInspect").disabled = false;
+    }
+
+    $("btnInspect").addEventListener("click", () => inspect(urlInput.value));
+    urlInput.addEventListener("keydown", e => {
+      if (e.key === "Enter") inspect(urlInput.value);
+    });
+
+    const paramUrl = new URLSearchParams(location.search).get("url");
+    if (paramUrl) {
+      urlInput.value = paramUrl;
+      inspect(paramUrl);
+    } else {
+      urlInput.focus();
+    }
+  </script>
+</body>
+</html>
