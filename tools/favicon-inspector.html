@@ -232,6 +232,27 @@
 
     .cardnote { font-size: 11px; color: var(--muted); }
     .cardnote.err { color: var(--bad); }
+    .cardnote.warn { color: var(--warn); }
+
+    .cards.services { grid-template-columns: 1fr; }
+    .card.service { display: block; }
+
+    .sizestrip {
+      display: flex;
+      gap: 18px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: repeating-conic-gradient(rgba(255,255,255,0.10) 0% 25%, rgba(0,0,0,0.20) 0% 50%) 0 0 / 16px 16px;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .sizestrip figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+    .sizestrip figcaption { font-size: 10px; color: var(--muted); }
+    .sizestrip img { display: block; image-rendering: pixelated; }
+    .sizestrip .missmark { color: var(--bad); font-size: 14px; }
 
     .misses { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
     .misses:empty { display: none; }
@@ -750,6 +771,8 @@
     function renderCardError(parts, cand, message) {
       const { preview, body } = parts;
       preview.textContent = "unavailable";
+      const note = el("div", "cardnote err", message);
+      body.appendChild(note);
       if (cand.url) {
         // bytes were unreachable, but a plain <img> is exempt from CORS — it
         // may still display (conversion stays impossible: tainted canvas).
@@ -757,11 +780,13 @@
         img.alt = "";
         img.style.maxWidth = "88px";
         img.style.maxHeight = "88px";
-        img.onload = () => { preview.replaceChildren(img); };
+        img.onload = () => {
+          preview.replaceChildren(img);
+          note.className = "cardnote warn";
+          note.textContent = "preview only — could not read the file (" + message + "), so format details and downloads are unavailable";
+        };
         img.src = cand.url;
       }
-      const note = el("div", "cardnote err", message);
-      body.appendChild(note);
     }
 
     async function addIconCard(sec, cand, host, opts = {}) {
@@ -891,22 +916,102 @@
       finishSection(sec, results);
     }
 
-    async function runServices(sec, host) {
-      const cands = [];
-      for (const sz of [16, 32, 64, 128, 256]) {
-        cands.push({
-          url: "https://www.google.com/s2/favicons?domain=" + encodeURIComponent(host) + "&sz=" + sz,
-          label: "Google favicon service, requested size " + sz + " (serves a default globe when it has nothing)",
-          slug: "google-s2-" + sz,
-        });
+    // Service cards work differently from the rest: neither Google nor
+    // DuckDuckGo sends CORS headers, so bytes are usually unreadable and the
+    // previews are plain <img> tags shown at their true pixel size. Reading
+    // the bytes (for downloads) is only attempted on demand, when clicked.
+    function serviceCard(sec, svc) {
+      const card = el("div", "card service");
+      const body = el("div", "cardbody");
+      card.appendChild(body);
+      body.appendChild(el("code", "snippet", svc.title + (svc.note ? " — " + svc.note : "")));
+
+      const strip = el("div", "sizestrip");
+      for (const entry of svc.sizes) {
+        const fig = el("figure");
+        const a = document.createElement("a");
+        a.href = entry.url;
+        a.target = "_blank";
+        a.rel = "noopener";
+        const img = document.createElement("img");
+        img.alt = "";
+        if (entry.size) { img.width = entry.size; img.height = entry.size; }
+        else { img.style.maxWidth = "64px"; img.style.maxHeight = "64px"; }
+        img.onerror = () => fig.replaceChildren(
+          el("span", "missmark", "✕"),
+          el("figcaption", null, entry.size ? entry.size + "px" : "as served"));
+        img.src = entry.url;
+        a.appendChild(img);
+        fig.appendChild(a);
+        fig.appendChild(el("figcaption", null, entry.size ? entry.size + "px" : "as served"));
+        strip.appendChild(fig);
       }
-      cands.push({
-        url: "https://icons.duckduckgo.com/ip3/" + encodeURIComponent(host) + ".ico",
-        label: "DuckDuckGo icon service",
-        slug: "duckduckgo",
+      body.appendChild(strip);
+
+      const urlLink = el("a", "iconurl", svc.sizes[svc.sizes.length - 1].url);
+      urlLink.href = svc.sizes[svc.sizes.length - 1].url;
+      urlLink.target = "_blank";
+      urlLink.rel = "noopener";
+      body.appendChild(urlLink);
+
+      const dl = el("div", "dl");
+      let sel = null;
+      if (svc.sizes.length > 1) {
+        sel = document.createElement("select");
+        for (const e of svc.sizes) {
+          const o = document.createElement("option");
+          o.value = String(e.size);
+          o.textContent = e.size + "px";
+          sel.appendChild(o);
+        }
+        sel.value = String(svc.sizes[svc.sizes.length - 1].size);
+        dl.appendChild(sel);
+      }
+      const note = el("div", "cardnote");
+      const pick = () => sel ? svc.sizes.find(e => String(e.size) === sel.value) : svc.sizes[0];
+      const stem = () => fileStem(svc.host, { slug: svc.slug + (pick().size ? "-" + pick().size : "") });
+      const withItem = async fn => {
+        note.className = "cardnote";
+        note.textContent = "fetching…";
+        try {
+          await fn(await analyzeIcon(pick().url));
+          note.textContent = "";
+        } catch (err) {
+          note.className = "cardnote err";
+          note.textContent = "could not read the file for download (" + err.message + ") — the service blocks cross-origin reads and no proxy could fetch it";
+        }
+      };
+      const btnOrig = el("button", null, "Original");
+      btnOrig.addEventListener("click", () => withItem(item => saveBlob(item.blob, stem() + "." + item.format.ext)));
+      dl.appendChild(btnOrig);
+      const btnPng = el("button", "primary", "PNG");
+      btnPng.addEventListener("click", () => withItem(async item => saveBlob(await toPngBlob(item, 0), stem() + ".png")));
+      dl.appendChild(btnPng);
+      body.appendChild(dl);
+      body.appendChild(note);
+
+      sec.cardsEl.appendChild(card);
+    }
+
+    async function runServices(sec, host) {
+      sec.cardsEl.classList.add("services");
+      serviceCard(sec, {
+        title: "Google favicon service",
+        note: "requested at each size below; serves a default globe when it has nothing",
+        sizes: [16, 32, 64, 128, 256].map(sz => ({
+          size: sz,
+          url: "https://www.google.com/s2/favicons?domain=" + encodeURIComponent(host) + "&sz=" + sz,
+        })),
+        slug: "google-s2",
+        host,
       });
-      const results = await Promise.all(cands.map(c => addIconCard(sec, c, host)));
-      finishSection(sec, results);
+      serviceCard(sec, {
+        title: "DuckDuckGo icon service",
+        sizes: [{ size: null, url: "https://icons.duckduckgo.com/ip3/" + encodeURIComponent(host) + ".ico" }],
+        slug: "duckduckgo",
+        host,
+      });
+      setSectionStatus(sec, "2 services", "dim");
     }
 
     // ---------- orchestration ----------
