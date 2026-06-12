@@ -79,6 +79,18 @@
     .dropzone.dragging * { pointer-events: none; }
     .dropzone .hint { color: var(--muted); font-size: 13px; }
 
+    /* before a file is loaded, the dropzone is the main event — make it big */
+    body:not(.loaded) .dropzone {
+      flex-direction: column;
+      justify-content: center;
+      min-height: 320px;
+      border-style: dashed;
+      border-width: 2px;
+      text-align: center;
+    }
+    body:not(.loaded) .dropzone .hint { font-size: 15px; max-width: 480px; }
+    body:not(.loaded) .dropzone button { font-size: 15px; padding: 12px 18px; }
+
     button {
       border: 1px solid var(--border);
       background: rgba(255,255,255,0.08);
