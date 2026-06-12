@@ -1,0 +1,1077 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>M4B Audiobook Inspector</title>
+  <style>
+    :root {
+      --pad: 14px;
+      --gap: 12px;
+      --border: rgba(255,255,255,0.12);
+      --muted: rgba(255,255,255,0.7);
+      --bg: #0f111a;
+      --panel: #151827;
+      --panel2: #101322;
+      --text: #e6e6f0;
+      --accent: #A78BFA;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      padding: 18px 18px 10px 18px;
+      display: flex;
+      gap: 16px;
+      align-items: baseline;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 {
+      font-size: 16px;
+      margin: 0;
+      letter-spacing: 0.02em;
+      font-weight: 800;
+    }
+
+    header .description {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 0;
+    }
+
+    main { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+    .group {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(0,0,0,0.22);
+    }
+
+    .group h2 {
+      font-size: 12px;
+      margin: 0 0 10px 0;
+      color: var(--muted);
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .dropzone {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      transition: border-color 120ms, background-color 120ms;
+    }
+    .dropzone.dragging {
+      border-color: var(--accent);
+      background: rgba(167,139,250,0.12);
+    }
+    .dropzone.dragging * { pointer-events: none; }
+    .dropzone .hint { color: var(--muted); font-size: 13px; }
+
+    button {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:hover { border-color: rgba(255,255,255,0.22); }
+    button.primary {
+      background: rgba(167,139,250,0.18);
+      border-color: rgba(167,139,250,0.45);
+    }
+
+    .status { font-size: 12px; color: var(--muted); min-height: 16px; }
+
+    .errorBox {
+      border: 1px solid rgba(248,113,113,0.45);
+      background: rgba(248,113,113,0.10);
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      display: none;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+    .layout, #rawDetails { display: none; }
+    body.loaded .layout { display: grid; }
+    body.loaded #rawDetails { display: block; }
+
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .coverRow { display: flex; gap: 14px; align-items: flex-start; }
+    .cover {
+      width: 160px;
+      height: 160px;
+      flex: none;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      object-fit: cover;
+      background: rgba(255,255,255,0.04);
+    }
+    .coverPlaceholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      padding: 8px;
+    }
+
+    .bookTitle { font-size: 18px; font-weight: 800; margin: 0 0 2px 0; }
+    .bookAuthor { font-size: 14px; color: var(--muted); margin: 0; }
+
+    dl.fields {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 6px 14px;
+      margin: 0;
+      font-size: 13px;
+    }
+    dl.fields dt { color: var(--muted); white-space: nowrap; }
+    dl.fields dd { margin: 0; overflow-wrap: anywhere; }
+
+    .longtext {
+      font-size: 13px;
+      color: rgba(255,255,255,0.85);
+      line-height: 1.45;
+      max-height: 180px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.06);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .chip b { color: var(--accent); font-weight: 700; }
+
+    audio { width: 100%; }
+
+    .chapwrap { max-height: 480px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
+    table.chapters { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.chapters th {
+      position: sticky;
+      top: 0;
+      background: rgba(16,19,34,0.97);
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    table.chapters td {
+      padding: 7px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      vertical-align: top;
+    }
+    table.chapters tbody tr { cursor: pointer; }
+    table.chapters tbody tr:hover { background: rgba(167,139,250,0.10); }
+    table.chapters tbody tr.current { background: rgba(167,139,250,0.20); }
+    table.chapters td.num { color: var(--muted); width: 1%; text-align: right; }
+    table.chapters td.time { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); width: 1%; }
+
+    .empty { color: var(--muted); font-size: 13px; padding: 8px 2px; }
+
+    details.raw { border: 1px solid var(--border); border-radius: 12px; background: rgba(0,0,0,0.22); }
+    details.raw > summary {
+      cursor: pointer;
+      padding: 12px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    details.raw .rawInner { padding: 0 12px 12px 12px; display: flex; flex-direction: column; gap: 12px; }
+
+    table.rawtags { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.rawtags th, table.rawtags td {
+      text-align: left;
+      padding: 6px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      vertical-align: top;
+    }
+    table.rawtags th { color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: 0.06em; }
+    table.rawtags td.k { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; white-space: nowrap; }
+    table.rawtags td.t { color: var(--muted); white-space: nowrap; }
+    table.rawtags td.v { overflow-wrap: anywhere; }
+
+    pre.tree {
+      margin: 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      overflow: auto;
+      max-height: 420px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(0,0,0,0.25);
+    }
+
+    ul.warnings { margin: 0; padding-left: 18px; font-size: 13px; color: #fcd34d; }
+    ul.warnings.none { color: var(--muted); list-style: none; padding-left: 2px; }
+
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>M4B Audiobook Inspector</h1>
+    <p class="description">Inspect M4B/M4A audiobook metadata in your browser: tags, cover art, chapters and technical details, with playback and chapter jumping. Files are read locally with byte-range slicing &mdash; nothing is uploaded.</p>
+  </header>
+
+  <main>
+    <div class="group dropzone" id="dropzone">
+      <button class="primary" id="btnPick">Choose file</button>
+      <input type="file" id="fileInput" accept=".m4b,.m4a,.mp4,.aax,audio/mp4,audio/x-m4a,audio/x-m4b" hidden />
+      <span class="hint">&hellip;or drop an .m4b file anywhere in this box. Only the metadata is read (a few KB&ndash;MB of a multi-GB file).</span>
+      <span class="status" id="status"></span>
+    </div>
+
+    <div class="errorBox" id="errorBox"></div>
+
+    <div class="layout">
+      <div class="panel" id="metaPanel">
+        <div class="coverRow">
+          <img class="cover" id="coverImg" alt="Cover art" hidden />
+          <div class="cover coverPlaceholder" id="coverPlaceholder">no cover art</div>
+          <div>
+            <p class="bookTitle" id="bookTitle"></p>
+            <p class="bookAuthor" id="bookAuthor"></p>
+          </div>
+        </div>
+        <div class="chips" id="chips"></div>
+        <dl class="fields" id="fields"></dl>
+        <div class="longtext" id="descBlock" hidden></div>
+      </div>
+
+      <div class="panel">
+        <audio id="player" controls preload="metadata"></audio>
+        <div class="status" id="playerNote"></div>
+        <div class="chapwrap" id="chapWrap"></div>
+      </div>
+    </div>
+
+    <details class="raw" id="rawDetails">
+      <summary>Raw details</summary>
+      <div class="rawInner">
+        <div>
+          <h2 style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px 0">All tags (ilst)</h2>
+          <table class="rawtags" id="rawTags"></table>
+        </div>
+        <div>
+          <h2 style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px 0">Atom tree</h2>
+          <pre class="tree" id="atomTree"></pre>
+        </div>
+        <div>
+          <h2 style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px 0">Warnings</h2>
+          <ul class="warnings" id="warnList"></ul>
+        </div>
+      </div>
+    </details>
+  </main>
+
+  <script>
+    "use strict";
+
+    // ---------- formatting ----------
+
+    const utf8 = new TextDecoder("utf-8");
+
+    function fmtBytes(n) {
+      if (!Number.isFinite(n)) return "?";
+      const units = ["B", "KB", "MB", "GB", "TB"];
+      let i = 0, v = n;
+      while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+      return (i === 0 ? String(v) : v.toFixed(1)) + " " + units[i];
+    }
+
+    const pad2 = n => String(n).padStart(2, "0");
+
+    function fmtTime(sec) {
+      if (!Number.isFinite(sec)) return "?";
+      sec = Math.max(0, Math.round(sec));
+      const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+      return h > 0 ? `${h}:${pad2(m)}:${pad2(s)}` : `${m}:${pad2(s)}`;
+    }
+
+    function hexPreview(bytes, max = 48) {
+      let s = "";
+      const n = Math.min(bytes.length, max);
+      for (let i = 0; i < n; i++) s += bytes[i].toString(16).padStart(2, "0") + " ";
+      if (bytes.length > max) s += "…";
+      return s.trim();
+    }
+
+    // ---------- low-level MP4 reading ----------
+
+    async function readSlice(file, offset, length) {
+      const buf = await file.slice(offset, offset + length).arrayBuffer();
+      return new DataView(buf);
+    }
+
+    function fourcc(dv, off) {
+      let s = "";
+      for (let i = 0; i < 4; i++) {
+        const b = dv.getUint8(off + i);
+        s += (b >= 0x20 && b < 0x7f) || b === 0xa9 ? String.fromCharCode(b) : "?";
+      }
+      return s;
+    }
+
+    function bytesAt(dv, start, end) {
+      return new Uint8Array(dv.buffer, dv.byteOffset + start, end - start);
+    }
+
+    // Scan top-level atoms without reading their contents (skips mdat entirely).
+    async function scanTopLevel(file, warnings) {
+      const atoms = [];
+      let off = 0;
+      while (off + 8 <= file.size) {
+        const dv = await readSlice(file, off, Math.min(16, file.size - off));
+        if (dv.byteLength < 8) break;
+        let size = dv.getUint32(0);
+        const type = fourcc(dv, 4);
+        let header = 8;
+        if (size === 1) {
+          if (dv.byteLength < 16) { warnings.push(`Truncated 64-bit atom header at offset ${off}.`); break; }
+          size = Number(dv.getBigUint64(8));
+          header = 16;
+        } else if (size === 0) {
+          size = file.size - off;
+        }
+        if (size < header || off + size > file.size) {
+          warnings.push(`Malformed atom '${type}' at offset ${off} (size ${size}); stopped scanning there.`);
+          break;
+        }
+        atoms.push({ type, offset: off, size, header });
+        off += size;
+      }
+      return atoms;
+    }
+
+    const CONTAINERS = new Set([
+      "moov", "trak", "edts", "mdia", "minf", "dinf", "stbl", "udta", "mvex", "tref", "ilst"
+    ]);
+
+    // Recursive parse of atoms inside an in-memory buffer (the moov atom).
+    function parseChildren(dv, start, end, absBase, parentType) {
+      const out = [];
+      let off = start;
+      while (off + 8 <= end) {
+        let size = dv.getUint32(off);
+        const type = fourcc(dv, off + 4);
+        let header = 8;
+        if (size === 1) {
+          if (off + 16 > end) break;
+          size = Number(dv.getBigUint64(off + 8));
+          header = 16;
+        } else if (size === 0) {
+          size = end - off;
+        }
+        if (size < header || off + size > end) break;
+        const node = { type, abs: absBase + off, size, start: off + header, end: off + size, children: [] };
+        let childStart = -1;
+        if (CONTAINERS.has(type)) {
+          childStart = node.start;
+        } else if (type === "meta") {
+          // iTunes meta is a "full atom" (4 bytes of version/flags before children);
+          // QuickTime meta is not. A zero uint32 can only be version/flags.
+          childStart = (node.end - node.start >= 4 && dv.getUint32(node.start) === 0)
+            ? node.start + 4 : node.start;
+        } else if (parentType === "ilst" && type !== "data") {
+          childStart = node.start; // ilst items contain data/mean/name atoms
+        }
+        if (childStart >= 0) node.children = parseChildren(dv, childStart, node.end, absBase, type);
+        out.push(node);
+        off += size;
+      }
+      return out;
+    }
+
+    const child = (node, type) => node.children.find(c => c.type === type);
+    const childAll = (node, type) => node.children.filter(c => c.type === type);
+    const atPath = (node, p) => p.split(".").reduce((n, t) => n && child(n, t), node);
+
+    // ---------- header atoms ----------
+
+    // mvhd and mdhd share the layout that matters to us.
+    function parseTimeHeader(dv, node) {
+      const v = dv.getUint8(node.start);
+      if (v === 1) {
+        return { timescale: dv.getUint32(node.start + 20), duration: Number(dv.getBigUint64(node.start + 24)) };
+      }
+      return { timescale: dv.getUint32(node.start + 12), duration: dv.getUint32(node.start + 16) };
+    }
+
+    function trackId(dv, trak) {
+      const tkhd = child(trak, "tkhd");
+      if (!tkhd) return -1;
+      const v = dv.getUint8(tkhd.start);
+      return dv.getUint32(tkhd.start + (v === 1 ? 20 : 12));
+    }
+
+    function handlerType(dv, trak) {
+      const hdlr = atPath(trak, "mdia.hdlr");
+      return hdlr && hdlr.end - hdlr.start >= 12 ? fourcc(dv, hdlr.start + 8) : null;
+    }
+
+    const CODEC_NAMES = {
+      "mp4a": "AAC (mp4a)",
+      "alac": "Apple Lossless (alac)",
+      "ac-3": "Dolby AC-3",
+      "ec-3": "Dolby E-AC-3",
+      "aavd": "Audible DRM audio (aavd)",
+    };
+
+    function parseAudioInfo(dv, trak) {
+      const stsd = atPath(trak, "mdia.minf.stbl.stsd");
+      if (!stsd || stsd.end - stsd.start < 16) return null;
+      const e = stsd.start + 8; // skip version/flags + entry count
+      const format = fourcc(dv, e + 4);
+      const info = { format, codec: CODEC_NAMES[format] || format };
+      const version = e + 18 <= stsd.end ? dv.getUint16(e + 16) : 0;
+      if (version === 2 && e + 52 <= stsd.end) {
+        info.sampleRate = dv.getFloat64(e + 40);
+        info.channels = dv.getUint32(e + 48);
+      } else if (e + 36 <= stsd.end) {
+        info.channels = dv.getUint16(e + 24);
+        info.sampleRate = dv.getUint32(e + 32) / 65536;
+      }
+      return info;
+    }
+
+    // ---------- tags (ilst) ----------
+
+    const DATA_TYPES = {
+      0: "binary", 1: "UTF-8", 2: "UTF-16", 13: "JPEG", 14: "PNG",
+      21: "int", 22: "uint", 23: "float32", 24: "float64", 27: "BMP",
+    };
+
+    const ID3_GENRES = ["Blues","Classic Rock","Country","Dance","Disco","Funk","Grunge","Hip-Hop","Jazz","Metal","New Age","Oldies","Other","Pop","R&B","Rap","Reggae","Rock","Techno","Industrial","Alternative","Ska","Death Metal","Pranks","Soundtrack","Euro-Techno","Ambient","Trip-Hop","Vocal","Jazz+Funk","Fusion","Trance","Classical","Instrumental","Acid","House","Game","Sound Clip","Gospel","Noise","Alt. Rock","Bass","Soul","Punk","Space","Meditative","Instrumental Pop","Instrumental Rock","Ethnic","Gothic","Darkwave","Techno-Industrial","Electronic","Pop-Folk","Eurodance","Dream","Southern Rock","Comedy","Cult","Gangsta Rap","Top 40","Christian Rap","Pop/Funk","Jungle","Native American","Cabaret","New Wave","Psychedelic","Rave","Showtunes","Trailer","Lo-Fi","Tribal","Acid Punk","Acid Jazz","Polka","Retro","Musical","Rock & Roll","Hard Rock"];
+
+    function sniffImage(bytes) {
+      if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+      if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
+      if (bytes.length >= 3 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return "image/gif";
+      if (bytes.length >= 2 && bytes[0] === 0x42 && bytes[1] === 0x4d) return "image/bmp";
+      return null;
+    }
+
+    function decodeTagValue(dv, key, dtype, s, e) {
+      const len = e - s;
+      const t = { key, dtype, typeLabel: DATA_TYPES[dtype] || `type ${dtype}` };
+      if (dtype === 1) {
+        t.kind = "text"; t.value = utf8.decode(bytesAt(dv, s, e)); t.display = t.value;
+        return t;
+      }
+      if (dtype === 2) {
+        t.kind = "text"; t.value = new TextDecoder("utf-16be").decode(bytesAt(dv, s, e)); t.display = t.value;
+        return t;
+      }
+      if (dtype === 13 || dtype === 14 || dtype === 27 || (dtype === 0 && key === "covr")) {
+        const bytes = bytesAt(dv, s, e);
+        const mime = sniffImage(bytes);
+        t.kind = "image"; t.bytes = bytes; t.mime = mime;
+        t.display = `${mime ? mime.split("/")[1].toUpperCase() : "image?"} image, ${fmtBytes(len)}`;
+        return t;
+      }
+      if (dtype === 21 || dtype === 22) {
+        let v = null;
+        if (len === 1) v = dtype === 21 ? dv.getInt8(s) : dv.getUint8(s);
+        else if (len === 2) v = dtype === 21 ? dv.getInt16(s) : dv.getUint16(s);
+        else if (len === 4) v = dtype === 21 ? dv.getInt32(s) : dv.getUint32(s);
+        else if (len === 8) v = Number(dtype === 21 ? dv.getBigInt64(s) : dv.getBigUint64(s));
+        t.kind = "int"; t.value = v; t.display = String(v);
+        return t;
+      }
+      if (dtype === 23 && len >= 4) { t.kind = "int"; t.value = dv.getFloat32(s); t.display = String(t.value); return t; }
+      if (dtype === 24 && len >= 8) { t.kind = "int"; t.value = dv.getFloat64(s); t.display = String(t.value); return t; }
+      if (dtype === 0 && (key === "trkn" || key === "disk") && len >= 6) {
+        const num = dv.getUint16(s + 2), total = dv.getUint16(s + 4);
+        t.kind = "text"; t.value = total ? `${num} of ${total}` : String(num); t.display = t.value;
+        return t;
+      }
+      if (dtype === 0 && key === "gnre" && len >= 2) {
+        const idx = dv.getUint16(s);
+        t.kind = "text"; t.value = ID3_GENRES[idx - 1] || `ID3 genre #${idx}`; t.display = t.value;
+        return t;
+      }
+      t.kind = "binary";
+      t.display = `${fmtBytes(len)}: ${hexPreview(bytesAt(dv, s, e))}`;
+      return t;
+    }
+
+    function atomText(dv, node, skip) {
+      const start = node.start + skip;
+      if (node.end - start <= 0) return "";
+      return utf8.decode(bytesAt(dv, start, node.end));
+    }
+
+    function extractTags(dv, ilst) {
+      const tags = [];
+      for (const item of ilst.children) {
+        let key = item.type;
+        if (item.type === "----") {
+          const mean = child(item, "mean"), name = child(item, "name");
+          key = `${mean ? atomText(dv, mean, 4) : "?"}:${name ? atomText(dv, name, 4) : "?"}`;
+        }
+        const datas = childAll(item, "data");
+        if (!datas.length) {
+          tags.push({ key, typeLabel: "—", kind: "binary", display: "(no data atom)" });
+          continue;
+        }
+        for (const d of datas) {
+          if (d.end - d.start < 8) continue;
+          const dtype = dv.getUint32(d.start) & 0xffffff;
+          tags.push(decodeTagValue(dv, key, dtype, d.start + 8, d.end));
+        }
+      }
+      return tags;
+    }
+
+    // ---------- chapters: Nero chpl ----------
+
+    function parseChpl(dv, chpl, warnings) {
+      // Layouts differ between muxers: count byte right after version/flags,
+      // or after an extra reserved uint32 (ffmpeg). Try both, validate strictly.
+      for (const countAt of [8, 4]) {
+        const res = tryChplLayout(dv, chpl, countAt);
+        if (res) return res;
+      }
+      warnings.push("A chpl atom is present but could not be parsed.");
+      return null;
+    }
+
+    function tryChplLayout(dv, chpl, countAt) {
+      let p = chpl.start + countAt;
+      if (p + 1 > chpl.end) return null;
+      const count = dv.getUint8(p);
+      p += 1;
+      if (count === 0) return null;
+      const out = [];
+      let prev = -1;
+      for (let i = 0; i < count; i++) {
+        if (p + 9 > chpl.end) return null;
+        const start = Number(dv.getBigUint64(p)) / 1e7; // 100 ns units
+        const len = dv.getUint8(p + 8);
+        p += 9;
+        if (p + len > chpl.end || start < prev) return null;
+        prev = start;
+        out.push({ start, title: utf8.decode(bytesAt(dv, p, p + len)) });
+        p += len;
+      }
+      return out;
+    }
+
+    // ---------- chapters: QuickTime chapter track ----------
+
+    function decodeTextSample(buf) {
+      if (buf.byteLength < 2) return "";
+      const dv = new DataView(buf);
+      const len = Math.min(dv.getUint16(0), buf.byteLength - 2);
+      const bytes = new Uint8Array(buf, 2, len);
+      if (len >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+        return new TextDecoder("utf-16be").decode(bytes.subarray(2));
+      }
+      if (len >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+        return new TextDecoder("utf-16le").decode(bytes.subarray(2));
+      }
+      return utf8.decode(bytes);
+    }
+
+    const MAX_CHAPTERS = 2000;
+
+    async function parseQtChapters(file, dv, moov, audioTrak, warnings) {
+      const traks = childAll(moov, "trak");
+
+      let ids = [];
+      if (audioTrak) {
+        const chap = atPath(audioTrak, "tref.chap");
+        if (chap) {
+          for (let p = chap.start; p + 4 <= chap.end; p += 4) ids.push(dv.getUint32(p));
+        }
+      }
+
+      let chapTrak = null;
+      if (ids.length) chapTrak = traks.find(t => ids.includes(trackId(dv, t)));
+      if (!chapTrak) {
+        chapTrak = traks.find(t => ["text", "sbtl"].includes(handlerType(dv, t)));
+        if (chapTrak) warnings.push("No tref/chap reference on the audio track; using the text track as chapters.");
+      }
+      if (!chapTrak) return null;
+
+      const mdhd = atPath(chapTrak, "mdia.mdhd");
+      const stbl = atPath(chapTrak, "mdia.minf.stbl");
+      if (!mdhd || !stbl) { warnings.push("Chapter track found, but it lacks mdhd/stbl."); return null; }
+      const { timescale } = parseTimeHeader(dv, mdhd);
+      if (!timescale) { warnings.push("Chapter track has zero timescale."); return null; }
+
+      const stts = child(stbl, "stts"), stsz = child(stbl, "stsz"), stsc = child(stbl, "stsc");
+      const stco = child(stbl, "stco"), co64 = child(stbl, "co64");
+      if (!stts || !stsz || !stsc || (!stco && !co64)) {
+        warnings.push("Chapter track is missing sample tables (stts/stsz/stsc/stco).");
+        return null;
+      }
+
+      // sample start times and durations
+      const starts = [], durs = [];
+      {
+        const n = dv.getUint32(stts.start + 4);
+        let p = stts.start + 8, t = 0;
+        for (let i = 0; i < n && p + 8 <= stts.end; i++, p += 8) {
+          const cnt = dv.getUint32(p), delta = dv.getUint32(p + 4);
+          for (let c = 0; c < cnt && starts.length <= MAX_CHAPTERS; c++) {
+            starts.push(t / timescale);
+            durs.push(delta / timescale);
+            t += delta;
+          }
+        }
+      }
+
+      // sample sizes
+      const sizes = [];
+      {
+        const uniform = dv.getUint32(stsz.start + 4);
+        const n = Math.min(dv.getUint32(stsz.start + 8), MAX_CHAPTERS + 1);
+        if (uniform) {
+          for (let i = 0; i < n; i++) sizes.push(uniform);
+        } else {
+          let p = stsz.start + 12;
+          for (let i = 0; i < n && p + 4 <= stsz.end; i++, p += 4) sizes.push(dv.getUint32(p));
+        }
+      }
+
+      // chunk offsets (absolute file offsets)
+      const chunkOffsets = [];
+      if (stco) {
+        const n = dv.getUint32(stco.start + 4);
+        let p = stco.start + 8;
+        for (let i = 0; i < n && p + 4 <= stco.end; i++, p += 4) chunkOffsets.push(dv.getUint32(p));
+      } else {
+        const n = dv.getUint32(co64.start + 4);
+        let p = co64.start + 8;
+        for (let i = 0; i < n && p + 8 <= co64.end; i++, p += 8) chunkOffsets.push(Number(dv.getBigUint64(p)));
+      }
+
+      // sample-to-chunk runs
+      const runs = [];
+      {
+        const n = dv.getUint32(stsc.start + 4);
+        let p = stsc.start + 8;
+        for (let i = 0; i < n && p + 12 <= stsc.end; i++, p += 12) {
+          runs.push({ first: dv.getUint32(p), per: dv.getUint32(p + 4) });
+        }
+      }
+
+      // per-sample absolute file offsets
+      const offsets = [];
+      let si = 0;
+      outer:
+      for (let r = 0; r < runs.length; r++) {
+        const lastChunk = r + 1 < runs.length ? runs[r + 1].first - 1 : chunkOffsets.length;
+        for (let c = runs[r].first; c <= lastChunk; c++) {
+          let off = chunkOffsets[c - 1];
+          if (off === undefined) break outer;
+          for (let k = 0; k < runs[r].per; k++) {
+            if (si >= sizes.length) break outer;
+            offsets.push(off);
+            off += sizes[si];
+            si++;
+          }
+        }
+      }
+
+      let count = Math.min(starts.length, sizes.length, offsets.length);
+      if (count > MAX_CHAPTERS) {
+        warnings.push(`Chapter track has more than ${MAX_CHAPTERS} entries; showing the first ${MAX_CHAPTERS}.`);
+        count = MAX_CHAPTERS;
+      }
+      if (count === 0) return null;
+
+      const chapters = [];
+      for (let i = 0; i < count; i++) {
+        let title = "";
+        try {
+          const buf = await file.slice(offsets[i], offsets[i] + sizes[i]).arrayBuffer();
+          title = decodeTextSample(buf);
+        } catch (err) {
+          warnings.push(`Could not read chapter ${i + 1} title: ${err.message}`);
+        }
+        chapters.push({ start: starts[i], duration: durs[i], title: title || `Chapter ${i + 1}` });
+      }
+      return chapters;
+    }
+
+    // ---------- orchestrator ----------
+
+    async function parseM4b(file) {
+      const warnings = [];
+      const top = await scanTopLevel(file, warnings);
+      if (!top.length) throw new Error("Could not find any MP4 atoms — this does not look like an MP4/M4B file.");
+
+      const ftypTop = top.find(a => a.type === "ftyp");
+      const moovTop = top.find(a => a.type === "moov");
+      if (!moovTop) throw new Error("No moov atom found — the file has no MP4 metadata (or is not an MP4/M4B file).");
+      if (!ftypTop) warnings.push("No ftyp atom found; unusual, but parsing continued.");
+      if (moovTop.size > 256 * 1024 * 1024) {
+        throw new Error(`The moov atom is implausibly large (${fmtBytes(moovTop.size)}); refusing to load it.`);
+      }
+
+      let ftypInfo = null;
+      if (ftypTop && ftypTop.size >= 12) {
+        const fdv = await readSlice(file, ftypTop.offset + 8, Math.min(ftypTop.size - 8, 40));
+        const brands = [];
+        for (let p = 8; p + 4 <= fdv.byteLength; p += 4) brands.push(fourcc(fdv, p));
+        ftypInfo = { major: fourcc(fdv, 0), brands };
+      }
+
+      const moovBuf = await file.slice(moovTop.offset, moovTop.offset + moovTop.size).arrayBuffer();
+      const dv = new DataView(moovBuf);
+      const moov = {
+        type: "moov", abs: moovTop.offset, size: moovTop.size,
+        start: moovTop.header, end: moovTop.size,
+        children: parseChildren(dv, moovTop.header, moovTop.size, moovTop.offset, "moov"),
+      };
+
+      const mvhd = child(moov, "mvhd");
+      const movie = mvhd ? parseTimeHeader(dv, mvhd) : null;
+      const duration = movie && movie.timescale ? movie.duration / movie.timescale : null;
+      if (!mvhd) warnings.push("No mvhd atom; duration unknown.");
+
+      const traks = childAll(moov, "trak");
+      const audioTrak = traks.find(t => handlerType(dv, t) === "soun") || null;
+      if (!audioTrak) warnings.push("No audio track found in this file.");
+      const audio = audioTrak ? parseAudioInfo(dv, audioTrak) : null;
+      if (audio && audio.format === "aavd") {
+        warnings.push("This is Audible DRM-encrypted audio; metadata is readable but the browser cannot play it.");
+      }
+
+      const ilst = atPath(moov, "udta.meta.ilst");
+      const tags = ilst ? extractTags(dv, ilst) : [];
+      if (!ilst) warnings.push("No iTunes-style tag list (moov/udta/meta/ilst) found.");
+
+      const chplAtom = atPath(moov, "udta.chpl");
+      const neroChapters = chplAtom ? parseChpl(dv, chplAtom, warnings) : null;
+      let qtChapters = null;
+      try {
+        qtChapters = await parseQtChapters(file, dv, moov, audioTrak, warnings);
+      } catch (err) {
+        warnings.push("QuickTime chapter parsing failed: " + err.message);
+      }
+
+      let chapters = null, chapterSource = null;
+      if (qtChapters && qtChapters.length) {
+        chapters = qtChapters;
+        chapterSource = "QuickTime chapter track";
+        if (neroChapters && neroChapters.length && neroChapters.length !== qtChapters.length) {
+          warnings.push(`File also has Nero chpl chapters with a different count (${neroChapters.length} vs ${qtChapters.length}).`);
+        }
+      } else if (neroChapters && neroChapters.length) {
+        chapters = neroChapters;
+        chapterSource = "Nero chpl atom";
+      }
+      if (chapters) {
+        for (let i = 0; i < chapters.length; i++) {
+          if (chapters[i].duration == null) {
+            const end = i + 1 < chapters.length ? chapters[i + 1].start : (duration ?? chapters[i].start);
+            chapters[i].duration = Math.max(0, end - chapters[i].start);
+          }
+        }
+      }
+
+      const mdatBytes = top.filter(a => a.type === "mdat").reduce((s, a) => s + a.size, 0);
+      const bitrateKbps = duration && mdatBytes ? (mdatBytes * 8) / duration / 1000 : null;
+
+      return { top, moov, dv, ftypInfo, duration, audio, tags, chapters, chapterSource, mdatBytes, bitrateKbps, warnings };
+    }
+
+    // ---------- UI ----------
+
+    const $ = id => document.getElementById(id);
+    const dropzone = $("dropzone"), fileInput = $("fileInput"), statusEl = $("status"), errorBox = $("errorBox");
+    const coverImg = $("coverImg"), coverPlaceholder = $("coverPlaceholder");
+    const player = $("player"), playerNote = $("playerNote"), chapWrap = $("chapWrap");
+
+    let mediaUrl = null, coverUrl = null;
+    let chapterRows = [], chapterStarts = [], currentChapter = -1;
+
+    function setStatus(msg) { statusEl.textContent = msg || ""; }
+
+    function showError(msg) {
+      errorBox.style.display = msg ? "block" : "none";
+      errorBox.textContent = msg || "";
+    }
+
+    function el(tag, className, text) {
+      const e = document.createElement(tag);
+      if (className) e.className = className;
+      if (text !== undefined) e.textContent = text;
+      return e;
+    }
+
+    function addField(dl, label, value) {
+      if (value === null || value === undefined || value === "") return;
+      dl.appendChild(el("dt", null, label));
+      dl.appendChild(el("dd", null, String(value)));
+    }
+
+    function addChip(parent, label, value) {
+      if (value === null || value === undefined || value === "") return;
+      const c = el("span", "chip");
+      c.appendChild(document.createTextNode(label + " "));
+      c.appendChild(el("b", null, String(value)));
+      parent.appendChild(c);
+    }
+
+    const STIK_NAMES = { 0: "Movie (old)", 1: "Music", 2: "Audiobook", 5: "Whacked bookmark", 6: "Music video", 9: "Movie", 10: "TV show", 11: "Booklet", 14: "Ringtone", 21: "Podcast", 23: "iTunes U" };
+
+    function render(r, file) {
+      const tagValue = key => {
+        const t = r.tags.find(t => t.key === key && t.kind !== "image");
+        return t ? (t.value ?? t.display) : null;
+      };
+
+      // cover
+      const coverTag = r.tags.find(t => t.kind === "image" && t.bytes);
+      if (coverUrl) { URL.revokeObjectURL(coverUrl); coverUrl = null; }
+      if (coverTag) {
+        coverUrl = URL.createObjectURL(new Blob([coverTag.bytes], { type: coverTag.mime || "image/jpeg" }));
+        coverImg.src = coverUrl;
+        coverImg.hidden = false;
+        coverPlaceholder.style.display = "none";
+      } else {
+        coverImg.hidden = true;
+        coverImg.removeAttribute("src");
+        coverPlaceholder.style.display = "flex";
+      }
+
+      $("bookTitle").textContent = tagValue("©nam") || file.name;
+      $("bookAuthor").textContent = tagValue("©ART") || "";
+
+      // chips
+      const chips = $("chips");
+      chips.replaceChildren();
+      addChip(chips, "duration", r.duration != null ? fmtTime(r.duration) : null);
+      addChip(chips, "size", fmtBytes(file.size));
+      addChip(chips, "codec", r.audio ? r.audio.codec : null);
+      addChip(chips, "sample rate", r.audio && r.audio.sampleRate ? (r.audio.sampleRate / 1000) + " kHz" : null);
+      addChip(chips, "channels", r.audio && r.audio.channels ? ({ 1: "mono", 2: "stereo" }[r.audio.channels] || r.audio.channels) : null);
+      addChip(chips, "bitrate", r.bitrateKbps ? Math.round(r.bitrateKbps) + " kbps" : null);
+      addChip(chips, "chapters", r.chapters ? `${r.chapters.length} (${r.chapterSource})` : "none found");
+      addChip(chips, "ftyp", r.ftypInfo ? r.ftypInfo.major.trim() : null);
+
+      // fields
+      const fields = $("fields");
+      fields.replaceChildren();
+      addField(fields, "Album", tagValue("©alb"));
+      addField(fields, "Album artist", tagValue("aART"));
+      addField(fields, "Narrator / composer", tagValue("©wrt"));
+      addField(fields, "Year", tagValue("©day"));
+      addField(fields, "Genre", tagValue("©gen") || tagValue("gnre"));
+      addField(fields, "Track", tagValue("trkn"));
+      addField(fields, "Disc", tagValue("disk"));
+      const stik = r.tags.find(t => t.key === "stik" && t.kind === "int");
+      addField(fields, "Media kind", stik ? (STIK_NAMES[stik.value] || `#${stik.value}`) : null);
+      addField(fields, "Copyright", tagValue("cprt"));
+      addField(fields, "Encoder", tagValue("©too"));
+      addField(fields, "Comment", tagValue("©cmt"));
+
+      const desc = tagValue("ldes") || tagValue("desc");
+      const descBlock = $("descBlock");
+      descBlock.hidden = !desc;
+      descBlock.textContent = desc || "";
+
+      // chapters
+      chapWrap.replaceChildren();
+      chapterRows = []; chapterStarts = []; currentChapter = -1;
+      if (r.chapters && r.chapters.length) {
+        const table = el("table", "chapters");
+        const thead = el("thead");
+        const hr = el("tr");
+        for (const h of ["#", "Title", "Start", "Length"]) hr.appendChild(el("th", null, h));
+        thead.appendChild(hr);
+        table.appendChild(thead);
+        const tbody = el("tbody");
+        r.chapters.forEach((ch, i) => {
+          const tr = el("tr");
+          tr.appendChild(el("td", "num", String(i + 1)));
+          tr.appendChild(el("td", null, ch.title));
+          tr.appendChild(el("td", "time", fmtTime(ch.start)));
+          tr.appendChild(el("td", "time", fmtTime(ch.duration)));
+          tr.addEventListener("click", () => {
+            player.currentTime = ch.start + 0.01;
+            player.play().catch(() => {});
+          });
+          tbody.appendChild(tr);
+          chapterRows.push(tr);
+          chapterStarts.push(ch.start);
+        });
+        table.appendChild(tbody);
+        chapWrap.appendChild(table);
+      } else {
+        chapWrap.appendChild(el("div", "empty", "No chapter data found (neither a QuickTime chapter track nor a Nero chpl atom)."));
+      }
+
+      // raw tags
+      const rawTags = $("rawTags");
+      rawTags.replaceChildren();
+      const rh = el("tr");
+      for (const h of ["Tag", "Type", "Value"]) rh.appendChild(el("th", null, h));
+      rawTags.appendChild(rh);
+      if (r.tags.length) {
+        for (const t of r.tags) {
+          const tr = el("tr");
+          tr.appendChild(el("td", "k", t.key));
+          tr.appendChild(el("td", "t", t.typeLabel));
+          tr.appendChild(el("td", "v", t.display));
+          rawTags.appendChild(tr);
+        }
+      } else {
+        const tr = el("tr");
+        tr.appendChild(el("td", "v", "(no tags)"));
+        rawTags.appendChild(tr);
+      }
+
+      // atom tree
+      const lines = [];
+      const atomLine = (depth, type, abs, size) =>
+        `${"  ".repeat(depth)}${type}  @ ${abs.toLocaleString()}  ${fmtBytes(size)}`;
+      const walk = (nodes, depth) => {
+        for (const n of nodes) {
+          lines.push(atomLine(depth, n.type, n.abs, n.size));
+          walk(n.children, depth + 1);
+        }
+      };
+      for (const a of r.top) {
+        if (a.type === "moov") {
+          lines.push(atomLine(0, "moov", a.offset, a.size));
+          walk(r.moov.children, 1);
+        } else {
+          lines.push(atomLine(0, a.type, a.offset, a.size) + (a.type === "mdat" ? "   (audio data — not read)" : ""));
+        }
+      }
+      $("atomTree").textContent = lines.join("\n");
+
+      // warnings
+      const warnList = $("warnList");
+      warnList.replaceChildren();
+      warnList.classList.toggle("none", !r.warnings.length);
+      if (r.warnings.length) {
+        for (const w of r.warnings) warnList.appendChild(el("li", null, w));
+      } else {
+        warnList.appendChild(el("li", null, "None — the file parsed cleanly."));
+      }
+    }
+
+    // chapter highlight during playback
+    player.addEventListener("timeupdate", () => {
+      if (!chapterStarts.length) return;
+      const t = player.currentTime;
+      let idx = -1;
+      for (let i = 0; i < chapterStarts.length; i++) {
+        if (t >= chapterStarts[i]) idx = i; else break;
+      }
+      if (idx === currentChapter) return;
+      if (currentChapter >= 0) chapterRows[currentChapter].classList.remove("current");
+      currentChapter = idx;
+      if (idx >= 0) {
+        chapterRows[idx].classList.add("current");
+        chapterRows[idx].scrollIntoView({ block: "nearest" });
+      }
+    });
+
+    player.addEventListener("error", () => {
+      if (player.src) playerNote.textContent = "The browser could not play this audio (unsupported or DRM-protected codec). Metadata above is unaffected.";
+    });
+
+    async function loadFile(file) {
+      showError("");
+      playerNote.textContent = "";
+      setStatus(`Parsing ${file.name}…`);
+      document.body.classList.remove("loaded");
+      try {
+        const t0 = performance.now();
+        const result = await parseM4b(file);
+        render(result, file);
+        if (mediaUrl) URL.revokeObjectURL(mediaUrl);
+        mediaUrl = URL.createObjectURL(file);
+        player.src = mediaUrl;
+        document.body.classList.add("loaded");
+        setStatus(`${file.name} — ${fmtBytes(file.size)}, parsed in ${Math.round(performance.now() - t0)} ms`);
+      } catch (err) {
+        setStatus("");
+        showError(`${file.name}: ${err.message}`);
+      }
+    }
+
+    $("btnPick").addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files && fileInput.files[0]) loadFile(fileInput.files[0]);
+    });
+
+    let dragCounter = 0;
+    dropzone.addEventListener("dragenter", e => {
+      e.preventDefault();
+      dragCounter++;
+      dropzone.classList.add("dragging");
+    });
+    dropzone.addEventListener("dragover", e => e.preventDefault());
+    dropzone.addEventListener("dragleave", () => {
+      dragCounter = Math.max(0, dragCounter - 1);
+      if (dragCounter === 0) dropzone.classList.remove("dragging");
+    });
+    dropzone.addEventListener("drop", e => {
+      e.preventDefault();
+      dragCounter = 0;
+      dropzone.classList.remove("dragging");
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file) loadFile(file);
+    });
+
+    // avoid the browser navigating away when a file is dropped outside the dropzone
+    window.addEventListener("dragover", e => e.preventDefault());
+    window.addEventListener("drop", e => e.preventDefault());
+  </script>
+</body>
+</html>
