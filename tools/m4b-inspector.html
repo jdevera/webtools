@@ -193,6 +193,10 @@
 
     audio { width: 100%; }
 
+    .chapnav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .chapnav button { padding: 8px 12px; }
+    .chapnav .status { flex: 1; min-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
     .chapwrap { max-height: 480px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
     table.chapters { width: 100%; border-collapse: collapse; font-size: 13px; }
     table.chapters th {
@@ -299,6 +303,11 @@
 
       <div class="panel">
         <audio id="player" controls preload="metadata"></audio>
+        <div class="chapnav">
+          <button id="btnPrevChap" disabled>&#9198; Previous</button>
+          <button id="btnNextChap" disabled>Next &#9197;</button>
+          <span class="status" id="nowPlaying"></span>
+        </div>
         <div class="status" id="playerNote"></div>
         <div class="chapwrap" id="chapWrap"></div>
       </div>
@@ -799,6 +808,23 @@
         warnings.push("This is Audible DRM-encrypted audio; metadata is readable but the browser cannot play it.");
       }
 
+      // The "M4A " major brand declares an audio-only file. When the file also
+      // carries a cover-art video track or a chapter text track, Safari/QuickTime
+      // refuse to open it (MEDIA_ERR_SRC_NOT_SUPPORTED) even though the audio is
+      // plain AAC. Changing the brand to "M4B "/"isom" fixes it without re-encoding.
+      const hasVideoTrack = traks.some(t => handlerType(dv, t) === "vide");
+      const hasTextTrack = traks.some(t => ["text", "sbtl"].includes(handlerType(dv, t)));
+      let playbackWarning = null;
+      if (ftypInfo && ftypInfo.major.trim() === "M4A" && (hasVideoTrack || hasTextTrack)) {
+        const extra = [];
+        if (hasVideoTrack) extra.push("a cover-art video track");
+        if (hasTextTrack) extra.push("a chapter text track");
+        playbackWarning = 'The ftyp major brand is "M4A " (which declares an audio-only file), but this file also contains non-audio tracks ('
+          + extra.join(" and ") + '). Some players — notably Safari/QuickTime — refuse to play such files. '
+          + 'Changing the major brand to "M4B " or "isom" (a 4-byte edit of the ftyp major-brand field, no re-encode) typically fixes playback.';
+        warnings.push(playbackWarning);
+      }
+
       const ilst = atPath(moov, "udta.meta.ilst");
       const tags = ilst ? extractTags(dv, ilst) : [];
       if (!ilst) warnings.push("No iTunes-style tag list (moov/udta/meta/ilst) found.");
@@ -835,7 +861,7 @@
       const mdatBytes = top.filter(a => a.type === "mdat").reduce((s, a) => s + a.size, 0);
       const bitrateKbps = duration && mdatBytes ? (mdatBytes * 8) / duration / 1000 : null;
 
-      return { top, moov, dv, ftypInfo, duration, audio, tags, chapters, chapterSource, mdatBytes, bitrateKbps, warnings };
+      return { top, moov, dv, ftypInfo, duration, audio, tags, chapters, chapterSource, mdatBytes, bitrateKbps, playbackWarning, warnings };
     }
 
     // ---------- UI ----------
@@ -844,9 +870,11 @@
     const dropzone = $("dropzone"), fileInput = $("fileInput"), statusEl = $("status"), errorBox = $("errorBox");
     const coverImg = $("coverImg"), coverPlaceholder = $("coverPlaceholder");
     const player = $("player"), playerNote = $("playerNote"), chapWrap = $("chapWrap");
+    const btnPrevChap = $("btnPrevChap"), btnNextChap = $("btnNextChap"), nowPlaying = $("nowPlaying");
 
     let mediaUrl = null, coverUrl = null;
-    let chapterRows = [], chapterStarts = [], currentChapter = -1;
+    let chapterRows = [], chapterStarts = [], chapterTitles = [], currentChapter = -1;
+    let isDrm = false, playbackHint = "";
 
     function setStatus(msg) { statusEl.textContent = msg || ""; }
 
@@ -879,6 +907,8 @@
     const STIK_NAMES = { 0: "Movie (old)", 1: "Music", 2: "Audiobook", 5: "Whacked bookmark", 6: "Music video", 9: "Movie", 10: "TV show", 11: "Booklet", 14: "Ringtone", 21: "Podcast", 23: "iTunes U" };
 
     function render(r, file) {
+      isDrm = !!(r.audio && r.audio.format === "aavd");
+      playbackHint = r.playbackWarning || "";
       const tagValue = key => {
         const t = r.tags.find(t => t.key === key && t.kind !== "image");
         return t ? (t.value ?? t.display) : null;
@@ -936,7 +966,8 @@
 
       // chapters
       chapWrap.replaceChildren();
-      chapterRows = []; chapterStarts = []; currentChapter = -1;
+      chapterRows = []; chapterStarts = []; chapterTitles = []; currentChapter = -1;
+      nowPlaying.textContent = "";
       if (r.chapters && r.chapters.length) {
         const table = el("table", "chapters");
         const thead = el("thead");
@@ -958,12 +989,17 @@
           tbody.appendChild(tr);
           chapterRows.push(tr);
           chapterStarts.push(ch.start);
+          chapterTitles.push(ch.title);
         });
         table.appendChild(tbody);
         chapWrap.appendChild(table);
       } else {
         chapWrap.appendChild(el("div", "empty", "No chapter data found (neither a QuickTime chapter track nor a Nero chpl atom)."));
       }
+
+      const hasChapters = chapterStarts.length > 0;
+      btnPrevChap.disabled = !hasChapters;
+      btnNextChap.disabled = !hasChapters;
 
       // raw tags
       const rawTags = $("rawTags");
@@ -1017,24 +1053,67 @@
     }
 
     // chapter highlight during playback
-    player.addEventListener("timeupdate", () => {
-      if (!chapterStarts.length) return;
-      const t = player.currentTime;
+    function chapterIndexAt(t) {
       let idx = -1;
       for (let i = 0; i < chapterStarts.length; i++) {
         if (t >= chapterStarts[i]) idx = i; else break;
       }
+      return idx;
+    }
+
+    function gotoChapter(idx) {
+      if (idx < 0 || idx >= chapterStarts.length) return;
+      player.currentTime = chapterStarts[idx] + 0.01;
+      player.play().catch(() => {});
+    }
+
+    btnNextChap.addEventListener("click", () => {
+      const i = chapterIndexAt(player.currentTime);
+      gotoChapter(Math.min(chapterStarts.length - 1, i < 0 ? 0 : i + 1));
+    });
+    btnPrevChap.addEventListener("click", () => {
+      const i = chapterIndexAt(player.currentTime);
+      // jump to the previous chapter, but if we're more than 3s in, restart the current one first
+      if (i > 0 && player.currentTime - chapterStarts[i] < 3) gotoChapter(i - 1);
+      else gotoChapter(Math.max(0, i));
+    });
+
+    player.addEventListener("timeupdate", () => {
+      if (!chapterStarts.length) return;
+      const idx = chapterIndexAt(player.currentTime);
       if (idx === currentChapter) return;
-      if (currentChapter >= 0) chapterRows[currentChapter].classList.remove("current");
+      if (currentChapter >= 0 && chapterRows[currentChapter]) chapterRows[currentChapter].classList.remove("current");
       currentChapter = idx;
       if (idx >= 0) {
         chapterRows[idx].classList.add("current");
         chapterRows[idx].scrollIntoView({ block: "nearest" });
+        nowPlaying.textContent = `Now: ${idx + 1}. ${chapterTitles[idx] || ""}`;
       }
     });
 
+    const MEDIA_ERR_NAMES = {
+      1: "MEDIA_ERR_ABORTED — playback was aborted",
+      2: "MEDIA_ERR_NETWORK — a network error interrupted loading",
+      3: "MEDIA_ERR_DECODE — the decoder started but failed partway",
+      4: "MEDIA_ERR_SRC_NOT_SUPPORTED — the media engine refused to open this file",
+    };
+
     player.addEventListener("error", () => {
-      if (player.src) playerNote.textContent = "The browser could not play this audio (unsupported or DRM-protected codec). Metadata above is unaffected.";
+      const err = player.error;
+      if (!player.src || !err) return;
+      const parts = [
+        "The browser's audio engine could not play this file: " +
+          (MEDIA_ERR_NAMES[err.code] || ("MediaError code " + err.code)) + ".",
+      ];
+      if (err.message) parts.push("Engine detail: " + err.message);
+      if (isDrm) {
+        parts.push("The audio track is Audible DRM (aavd), which browsers cannot decrypt — almost certainly the cause.");
+      } else if (playbackHint) {
+        parts.push("Likely cause: " + playbackHint);
+      } else {
+        parts.push("The metadata above is parsed separately and is unaffected. A valid-looking file failing here usually means a browser playback limit — very large files or a container quirk — not a broken file.");
+      }
+      playerNote.textContent = parts.join(" ");
     });
 
     async function loadFile(file) {
