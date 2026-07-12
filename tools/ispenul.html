@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ispeñul Translator</title>
+  <style>
+    :root {
+      --pad: 14px;
+      --gap: 12px;
+      --border: rgba(255,255,255,0.12);
+      --muted: rgba(255,255,255,0.7);
+      --bg: #0f111a;
+      --panel: #151827;
+      --panel2: #101322;
+      --text: #e6e6f0;
+      --accent: #FBBF24;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 18px 18px 10px 18px;
+      display: flex;
+      gap: 16px;
+      align-items: baseline;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 {
+      font-size: 16px;
+      margin: 0;
+      letter-spacing: 0.02em;
+      font-weight: 800;
+    }
+
+    header h1 .tilde { color: var(--accent); }
+
+    header .description {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 0;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap);
+      padding: 16px;
+      max-width: 1100px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .controls {
+      display: flex;
+      gap: var(--gap);
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .controls label {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    select, button {
+      font: inherit;
+      font-size: 13px;
+      color: var(--text);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+    }
+
+    button { cursor: pointer; }
+    button:hover { border-color: var(--accent); }
+
+    #mode-label {
+      margin-left: auto;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.04em;
+    }
+
+    .panes {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--gap);
+      min-height: 320px;
+    }
+
+    .pane {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: var(--pad);
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+    }
+
+    .pane h2 {
+      font-size: 12px;
+      margin: 0;
+      color: var(--muted);
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .pane h2 button { font-size: 11px; padding: 3px 8px; }
+
+    textarea {
+      flex: 1;
+      resize: none;
+      font: inherit;
+      font-size: 16px;
+      line-height: 1.5;
+      color: var(--text);
+      background: rgba(0,0,0,0.22);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      min-height: 220px;
+    }
+
+    textarea:focus { outline: 1px solid var(--accent); }
+    textarea[readonly] { color: var(--accent); }
+
+    footer {
+      padding: 10px 18px 16px 18px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    footer .rule { color: var(--text); }
+    footer a { color: var(--accent); text-decoration: none; }
+
+    @media (max-width: 720px) {
+      .panes { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Ispe<span class="tilde">ñ</span>ul</h1>
+    <p class="description">
+      Translate Spanish into Ispeñul — the word game where every vowel advances one step
+      along a→e→i→o→u→a — and back. Includes the sibling variants Ospiñal (+2),
+      Uspoñel (+3) and Aspuñil (+4).
+    </p>
+  </header>
+
+  <main>
+    <div class="controls">
+      <label>Variant
+        <select id="variant">
+          <option value="1" selected>Ispeñul (+1)</option>
+          <option value="2">Ospiñal (+2)</option>
+          <option value="3">Uspoñel (+3)</option>
+          <option value="4">Aspuñil (+4)</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="decode" /> Decode (back to Spanish)</label>
+      <button id="swap" title="Move the output to the input and flip direction">⇄ Swap</button>
+      <span id="mode-label"></span>
+    </div>
+
+    <div class="panes">
+      <section class="pane">
+        <h2>Input</h2>
+        <textarea id="input" spellcheck="false" autofocus>Ayer vi a tu hermano en el supermercado.</textarea>
+      </section>
+      <section class="pane">
+        <h2>Output <button id="copy">Copy</button></h2>
+        <textarea id="output" readonly spellcheck="false"></textarea>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <span class="rule">The rule is phonetic, not typographic:</span> spelling repairs keep every consonant
+    sound intact (<em>carpinteros → querpontirus</em>), stressed diphthongs split with the written accent
+    recomputed (<em>puerta → paírte</em>), and the vocalic <em>y</em> comes and goes (<em>ley → lío</em>,
+    <em>tenue → tínay</em>). Applying Ispeñul five times returns the original text.
+    Syllabification by <a href="https://github.com/jdevera/jsilabeador">jsilabeador</a>;
+    translation logic and this page are GPL-3.0-or-later.
+  </footer>
+
+  <script>
+// ispenul + jsilabeador, bundled. GPL-3.0-or-later. Source: the ispenul repo.
+(()=>{var a=class extends Error{constructor(e,n=null){super(e),this.name="HyphenatorError",this.word=n}};var S=new Set("a\xE1e\xE9i\xEDo\xF3u\xFA\xFC"),A=new Set("bcdfghjklmn\xF1pqrstvwxyz"),$=new Set([...S,...A]),P="-N/A-";function l(t,e=P){return t==="y"?e===P?!1:!S.has(e):S.has(t)}function _(t){if(!t)throw new a("The word is empty");let e=t.toLowerCase(),n=[...new Set(e)].filter(s=>!$.has(s));if(n.length>0)throw new a(`The word ${t} contains invalid letters in Spanish: ${n.join(", ")}`);if(e.includes("\xFC")){let s=e.indexOf("\xFC"),r=s>0&&e[s-1]==="g",o=s+1<e.length&&"ei\xE9\xED".includes(e[s+1]);if(!r||!o)throw new a(`The word ${t} does not seem to be Spanish, where \xFC can only appear in g\xFCe or g\xFCi`)}}var N=class{constructor(e="",n="",s="",r=!1,o=!1){this.onset=e,this.nucleus=n,this.coda=s,this.accented=r,this.stressed=o}get value(){return`${this.onset}${this.nucleus}${this.coda}`}},T=class{constructor(e,n,s=null,r=null){this.original=e,this.syllables=Object.freeze([...n]),this.stressed=s,this.accented=r,Object.freeze(this)}get hyphenated(){return this.syllables.map(e=>e.value).join("-")}hyphenate(e=!1){let n=s=>!s.stressed||!e?s.value:`>${s.value}<`;return this.syllables.map(n).join("-")}},m=class{constructor(e){this.originalWord=e,this.pos=0,this.accent=null,this.stressFound=!1,this.stressed=null,this.syllables=[],this.word=e.toLowerCase(),this.len=this.word.length}get char(){return this.word[this.pos]??null}get oneAhead(){return this.lookAhead(1)}lookAhead(e=1){return this.hasNext(e)?this.word[this.pos+e]:null}get oneBehind(){return this.lookBehind(1)}lookBehind(e=1){return this.pos-e>=0?this.word[this.pos-e]:null}get ended(){return this.pos>=this.len}get atEnd(){return this.pos===this.len-1}next(e=1){for(let n=0;n<e;n++){if(!this.hasNext())return this.pos=this.len,null;this.pos+=1}return this.char}previous(){return this.pos>0?(this.pos-=1,this.char):null}hasNext(e=1){return this.pos+e<this.len}at(e){return this.word.at(e)}addSyllable(){let e=new N;return this.syllables.push(e),e}get currentSyllable(){return this.syllables.length>0?this.syllables[this.syllables.length-1]:null}toResult(){if(!this.ended)throw new Error("Word is not ended");if(!this.stressFound)throw new Error("Stress is not found");return new T(this.originalWord,this.syllables,this.stressed,this.accent)}},p=class t{constructor(e){this.chars=e}static OPEN=new t("aeo");static OPEN_WITH_ACCENT=new t("\xE1\xE9\xF3");static CLOSED=new t("iu\xFC");static CLOSED_WITH_ACCENT=new t("\xED\xFA");static fromChar(e){if(e.toLowerCase()==="y")return t.CLOSED;if(l(e)){for(let n of[t.OPEN,t.OPEN_WITH_ACCENT,t.CLOSED,t.CLOSED_WITH_ACCENT])if(n.chars.includes(e))return n}throw new Error(`${e} is not a vowel`)}get hasAccent(){return this===t.OPEN_WITH_ACCENT||this===t.CLOSED_WITH_ACCENT}get isClosed(){return this===t.CLOSED||this===t.CLOSED_WITH_ACCENT}get isOpen(){return this===t.OPEN_WITH_ACCENT||this===t.OPEN}};var j=new Set([...A].filter(t=>t!=="y"));function F(t){let e=new m(t);for(;!e.ended;){let n=e.addSyllable(),s=e.pos;n.onset=B(e),n.nucleus=G(e),n.coda=U(e);let r=e.pos;n.accented=e.accent!==null&&s<=e.accent&&e.accent<r;let o=e.syllables.length;e.stressFound&&e.stressed===null&&(e.stressed=o-1)}return e.stressed=M(e),e.syllables[e.stressed].stressed=!0,e.stressFound=!0,e}function M(t){let e;if(t.stressFound){if(t.stressed===null)throw new Error("Stressed syllable is not set for accented word");return t.stressed}let n=t.syllables.length;if(n===1)e=n-1;else{let s=t.at(-1),r=t.at(-2);s==="y"?l(r,s)?e=n-1:e=n-2:l(s)||"ns".includes(s)&&l(r)?e=n-2:e=n-1}return e}function v(t){return function(n){let s=n.pos;t(n);let r=n.pos;return n.originalWord.slice(s,r)}}var B=v(function(e){for(;!e.ended&&j.has(e.char);)e.next();if(!e.ended&&e.oneBehind!==null){let n=e.oneBehind+e.char;(n==="qu"||n==="gu"&&"ei\xE9\xED".includes(String(e.oneAhead))||n==="g\xFC")&&e.next()}}),G=v(function(e){let n=e.pos;if(e.ended)throw new a("Syllable has no nucleus. Perhaps the word has no vowels?",e);if(e.char==="y"&&(l(e.char,e.oneAhead)||e.next()),e.ended)return;if(!l(e.char,e.oneAhead))throw new a("Nucleus expects a vowel!",e);let s=p.fromChar(e.char);if(s.hasAccent&&(e.accent=e.pos,e.stressFound=!0),e.next(),s===p.CLOSED_WITH_ACCENT)return;let r=e.char==="h";if(r&&e.next(),e.ended)return;if(n===e.pos)throw new a("Expected to move forward in first stage of nucleus. Perhaps invalid chars?",e);let o=s;if(!l(e.char,e.oneAhead))return;let i=p.fromChar(e.char);if(i.isOpen){if(o.isOpen){r&&e.previous();return}i.hasAccent&&(e.accent=e.pos,e.stressFound=!0),e.next()}else if(i===p.CLOSED_WITH_ACCENT){e.accent=e.pos,o.isClosed?(e.stressFound=!0,e.next()):r&&e.previous();return}else if(i===p.CLOSED){if(e.oneAhead!==null&&l(e.oneAhead,e.lookAhead(2))){r&&e.previous();return}e.char!==e.oneBehind&&e.next();return}e.ended||(e.char!==null&&"ui".includes(e.char)&&e.next(),e.char==="y"&&e.atEnd&&e.next())}),U=v(function(e){if(e.ended||l(e.char,e.oneAhead))return;if(e.atEnd){e.next();return}if(e.hasNext()&&l(e.oneAhead,e.lookAhead(2)))return;if(e.pos>=e.len-2){e.oneAhead!=="y"&&e.next(2);return}let n=e.char,s=e.lookAhead(1),r=e.lookAhead(2);if(l(r,e.lookAhead(3))){let o=n+s;if(o==="ll"||o==="ch"||o==="rr"||!"sr".includes(n)&&s==="h")return;if(s==="y"){if(l("y",e.lookAhead(2)))return;e.next();return}if(["gl","cl","kl","bl","vl","pl","fl","tl","gr","cr","kr","br","vr","pr","fr","tr","dr"].includes(o))return;e.next()}else{if(e.pos>=e.len-3){if(s==="y"&&l("y",e.lookAhead(2)))return;r==="y"?e.next():e.next(3);return}if(s==="y"&&l("y",e.lookAhead(2))){e.next();return}if(["pt","ct","cn","ps","mn","gn","ft","pn","cz","tz","ts"].includes(s+r)){e.next();return}"lry".includes(r)||s+r==="ch"?e.next():e.next(2)}});function b(t){return t=t.normalize("NFC"),_(t),F(t).toResult()}var h=class extends Error{};var L="aeiou",K="aeo",Y="\xE1\xE9\xED\xF3\xFA",J={\u00E1:"a",\u00E9:"e",\u00ED:"i",\u00F3:"o",\u00FA:"u",\u00FC:"u",y:"i"},g=t=>J[t]??t,C=(t,e=!1)=>({vowel:!0,char:t,stressed:e}),c=(t="",e=null)=>({vowel:!1,spelling:t,sound:e});function R(t){if(t==="y")return{phones:[C("i",!0)],diacritic:!1};let e;try{e=b(t)}catch(s){throw new h(String(s?.message??s))}let n=[];for(let s of e.syllables){let r=s.nucleus.toLowerCase(),o=r?g(r[0]):"";n.push(...Q(s.onset.toLowerCase(),o));let i=s.stressed?X(r):null;for(let u=0;u<r.length;u++){let x=r[u];x==="y"&&u+1<r.length?n.push(c("y")):x==="h"?n.push(c("h")):n.push(C(g(x),u===i))}s.coda&&n.push(c(s.coda.toLowerCase()))}if(!n.some(s=>s.vowel))throw new h(`The word ${t} has no vowels to rotate`);return{phones:n,diacritic:Z(e)}}function q(t,e){return{phones:t.phones.map(s=>s.vowel?C(L[(L.indexOf(s.char)+e)%5],s.stressed):s),diacritic:t.diacritic}}function Q(t,e){if(!t)return[];let n=e==="e"||e==="i";if(t==="qu"||t==="gu"){let s=c("",t==="qu"?"K":"G");return n?[s]:[s,C("u")]}return t==="g\xFC"?[c("","GW")]:t==="c"?[c("",n?"TH":"K")]:t==="z"?[c("","TH")]:t==="g"?n?[c("j")]:[c("","G")]:[c(t)]}function X(t){for(let n=0;n<t.length;n++)if(Y.includes(t[n]))return n;for(let n=0;n<t.length;n++)if(K.includes(g(t[n])))return n;let e=[];for(let n=0;n<t.length;n++)t[n]!=="h"&&e.push(n);return e.length===0?null:e.length>1&&t[e.at(-1)]==="y"?e.at(-2):e.at(-1)}function Z(t){let e=t.syllables.flatMap((n,s)=>n.accented?[s]:[]);return e.length===0?!1:t.syllables.length===1?!0:w(t.original)?!1:e[0]===ee(t)}function w(t){let e=t.toLowerCase(),n="aeiou\xE1\xE9\xED\xF3\xFA\xFC";for(let s=0;s<e.length;s++)if(!(e[s]!=="\xED"&&e[s]!=="\xFA"))for(let r of[-1,1]){let o=s+r;if(o>=0&&o<e.length&&e[o]==="h"&&(o+=r),!!(o>=0&&o<e.length&&n.includes(e[o]))&&!(r===-1&&e[o]==="u"&&o>0&&"qg".includes(e[o-1])))return!0}return!1}function ee(t){let e=t.original.toLowerCase().at(-1);return L.includes(g(e))&&e!=="y"||e==="n"||e==="s"?Math.max(t.syllables.length-2,0):t.syllables.length-1}var O="aeo",te={a:"\xE1",e:"\xE9",i:"\xED",o:"\xF3",u:"\xFA"},ne={K:["qu","c"],TH:["c","z"],G:["gu","g"],GW:["g\xFC","gu"]};function V(t){let e=[...t.phones];se(e);let{letters:n,vowelEntries:s}=re(e);le(n,s,e,t.diacritic);let r=n.join("");return r==="i"?"y":r}function se(t){let e=t.at(-1),n=t.at(-2);t.length>=2&&e?.vowel&&e.char==="i"&&!e.stressed&&n?.vowel&&(t[t.length-1]=c("y"))}function re(t){let e=[],n=[];for(let s=0;s<t.length;s++){let r=t[s];r.vowel?(n.push({letterIndex:e.length,phoneIndex:s,char:r.char,stressed:r.stressed}),e.push(r.char)):r.sound===null?e.push(...r.spelling):e.push(...ie(r.sound,oe(t,s)))}return{letters:e,vowelEntries:n}}function oe(t,e){for(let n=e+1;n<t.length;n++)if(t[n].vowel)return t[n].char;return""}function ie(t,e){let[n,s]=ne[t];return e==="e"||e==="i"?n:s}function le(t,e,n,s){let r=e.findIndex(f=>f.stressed);if(r===-1)return;let o=ce(e,n),i=o.flatMap(f=>ae(f,e)),u=i.findIndex(f=>f.includes(r));if(ue(r,o,e)||i.length>1&&u!==he(t,i)||s){let f=e[r].letterIndex;t[f]=te[t[f]]}}function ce(t,e){let n=[],s=null;for(let r=0;r<t.length;r++){let o=t[r].phoneIndex,i=e[s+1];s!==null&&(o===s+1||o===s+2&&i&&!i.vowel&&i.spelling==="h")?n.at(-1).push(r):n.push([r]),s=o}return n}function ae(t,e){let n=o=>O.includes(e[o].char),s=o=>e[o].stressed&&!n(o),r=[[t[0]]];for(let o of t.slice(1)){let i=r.at(-1).at(-1);n(i)&&n(o)||n(i)&&s(o)||s(i)&&n(o)?r.push([o]):r.at(-1).push(o)}return r}function ue(t,e,n){if(O.includes(n[t].char))return!1;let s=e.find(i=>i.includes(t)),r=s.indexOf(t);return[...s.slice(Math.max(r-1,0),r),...s.slice(r+1,r+2)].some(i=>O.includes(n[i].char))?!0:r+1<s.length}function he(t,e){let n=t.at(-1);return"aeiou".includes(n)||n==="n"||n==="s"?Math.max(e.length-2,0):e.length-1}var fe=/[a-záéíóúüñ]+/gi,pe=["mente","minti","monto","muntu","manta"];function z(t,e=1){let n=t.normalize("NFC"),s=W(n.toLowerCase(),(e%5+5)%5);return de(s,n)}function I(t,e=1){return t.normalize("NFC").replace(fe,n=>{if(n.length>1&&n===n.toUpperCase()&&n!==n.toLowerCase())return n;try{return z(n,e)}catch(s){if(s instanceof h)return n;throw s}})}function W(t,e){let n=pe.find(s=>t.endsWith(s)&&t.length>s.length);if(n!==void 0)try{return W(t.slice(0,-n.length),e)+W(n,e)}catch(s){if(!(s instanceof h))throw s}return V(q(R(t),e))}function de(t,e){if(e.length>1&&e===e.toUpperCase()&&e!==e.toLowerCase())return t.toUpperCase();let n=e[0]??"";return n&&n===n.toUpperCase()&&n!==n.toLowerCase()?t[0].toUpperCase()+t.slice(1):t}var E=document.querySelector("#input"),H=document.querySelector("#output"),D=document.querySelector("#variant"),d=document.querySelector("#decode"),ye=document.querySelector("#swap"),k=document.querySelector("#copy"),xe=document.querySelector("#mode-label"),me={1:"Ispe\xF1ul",2:"Ospi\xF1al",3:"Uspo\xF1el",4:"Aspu\xF1il"};function ge(){let t=Number(D.value);return d.checked?(5-t)%5:t}function y(){let t=me[D.value];xe.textContent=d.checked?`${t} \u2192 Espa\xF1ol`:`Espa\xF1ol \u2192 ${t}`,H.value=I(E.value,ge())}E.addEventListener("input",y);D.addEventListener("change",y);d.addEventListener("change",y);ye.addEventListener("click",()=>{E.value=H.value,d.checked=!d.checked,y(),E.focus()});k.addEventListener("click",async()=>{await navigator.clipboard.writeText(H.value),k.textContent="Copied!",setTimeout(()=>k.textContent="Copy",1200)});y();})();
+
+  </script>
+</body>
+</html>
