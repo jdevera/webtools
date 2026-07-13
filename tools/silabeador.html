@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Silabeador — Spanish Syllabification</title>
+  <style>
+    :root {
+      --pad: 14px;
+      --gap: 12px;
+      --border: rgba(255,255,255,0.12);
+      --muted: rgba(255,255,255,0.7);
+      --bg: #0f111a;
+      --panel: #151827;
+      --panel2: #101322;
+      --text: #e6e6f0;
+      --accent: #34D399;
+      --onset: #7DD3FC;
+      --nucleus: #34D399;
+      --coda: #F9A8D4;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 18px 18px 10px 18px;
+      display: flex;
+      gap: 16px;
+      align-items: baseline;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 { font-size: 16px; margin: 0; letter-spacing: 0.02em; font-weight: 800; }
+    header h1 span { color: var(--accent); }
+    header .description { color: var(--muted); font-size: 12px; margin: 0; }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap);
+      padding: 16px;
+      max-width: 900px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    #word {
+      font: inherit;
+      font-size: 22px;
+      color: var(--text);
+      background: rgba(0,0,0,0.22);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      width: 100%;
+    }
+    #word:focus { outline: 1px solid var(--accent); }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      font: inherit;
+      font-size: 12px;
+      color: var(--text);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px 10px;
+      cursor: pointer;
+      display: flex;
+      gap: 6px;
+      align-items: baseline;
+    }
+    .chip:hover { border-color: var(--accent); }
+    .chip small { color: var(--muted); font-size: 10px; }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: var(--pad);
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+    }
+
+    #summary { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 18px; }
+    #summary b { color: var(--text); font-weight: 700; }
+    #summary .hyph { color: var(--accent); font-weight: 800; letter-spacing: 0.06em; }
+
+    #blocks { display: flex; flex-wrap: wrap; gap: 10px; }
+    .syllable {
+      position: relative;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 14px 12px 14px;
+      background: rgba(0,0,0,0.22);
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: baseline;
+    }
+    .syllable.stressed { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .syllable .badge {
+      position: absolute;
+      top: -8px;
+      right: 8px;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #0f111a;
+      background: var(--accent);
+      border-radius: 999px;
+      padding: 2px 7px;
+    }
+    .part-onset { color: var(--onset); }
+    .part-nucleus { color: var(--nucleus); }
+    .part-coda { color: var(--coda); }
+
+    .legend { display: flex; gap: 16px; font-size: 11px; color: var(--muted); }
+    .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; }
+    tr:last-child td { border-bottom: none; }
+    td.num { color: var(--muted); }
+    td .tick { color: var(--accent); font-weight: 700; }
+    td.empty { color: rgba(255,255,255,0.3); }
+    td.mono-onset { color: var(--onset); }
+    td.mono-nucleus { color: var(--nucleus); }
+    td.mono-coda { color: var(--coda); }
+
+    #error { color: #FCA5A5; font-size: 13px; }
+    .hidden { display: none; }
+
+    footer {
+      padding: 10px 18px 16px 18px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Silabead<span>o</span>r</h1>
+    <p class="description">
+      Break any Spanish word into syllables and see its full anatomy: onset, nucleus and coda of
+      every syllable, which one carries the stress, and where the written accent sits — powered by
+      jsilabeador.
+    </p>
+  </header>
+
+  <main>
+    <input id="word" spellcheck="false" autocomplete="off" autofocus
+           placeholder="Type a Spanish word…" value="paraguay" />
+
+    <div class="chips" id="chips"></div>
+
+    <div class="card" id="result">
+      <div id="summary"></div>
+      <div style="height: 12px"></div>
+      <div id="blocks"></div>
+      <div style="height: 10px"></div>
+      <div class="legend">
+        <span><i style="background: var(--onset)"></i>onset (ataque)</span>
+        <span><i style="background: var(--nucleus)"></i>nucleus (núcleo)</span>
+        <span><i style="background: var(--coda)"></i>coda</span>
+      </div>
+    </div>
+
+    <div class="card hidden" id="error-card"><div id="error"></div></div>
+
+    <div class="card" id="table-card">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Syllable</th><th>Onset</th><th>Nucleus</th><th>Coda</th><th>Stressed</th><th>Accented</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <footer>
+    Syllabification by <a href="https://github.com/jdevera/jsilabeador">jsilabeador</a>
+    (a JavaScript port of <a href="https://github.com/jdevera/pylabeador">pylabeador</a>), embedded in this
+    page — everything runs locally. GPL-3.0-or-later.
+  </footer>
+
+  <script type="module">
+// jsilabeador@0.1.1 (GPL-3.0-or-later) — https://www.npmjs.com/package/jsilabeador
+// Inlined verbatim from https://cdn.jsdelivr.net/npm/jsilabeador@0.1.1/dist/jsilabeador.min.js
+var b=Object.defineProperty;var O=(t,e)=>{for(var s in e)b(t,s,{get:e[s],enumerable:!0})};var E={};O(E,{HyphenatorError:()=>o,hyphenate:()=>N,syllabify:()=>m,syllabifyWithDetails:()=>u});var o=class extends Error{constructor(e,s=null){super(e),this.name="HyphenatorError",this.word=s}};var f=new Set("a\xE1e\xE9i\xEDo\xF3u\xFA\xFC"),p=new Set("bcdfghjklmn\xF1pqrstvwxyz"),T=new Set([...f,...p]),d="-N/A-";function r(t,e=d){return t==="y"?e===d?!1:!f.has(e):f.has(t)}function S(t){if(!t)throw new o("The word is empty");let e=t.toLowerCase(),s=[...new Set(e)].filter(n=>!T.has(n));if(s.length>0)throw new o(`The word ${t} contains invalid letters in Spanish: ${s.join(", ")}`);if(e.includes("\xFC")){let n=e.indexOf("\xFC"),i=n>0&&e[n-1]==="g",l=n+1<e.length&&"ei\xE9\xED".includes(e[n+1]);if(!i||!l)throw new o(`The word ${t} does not seem to be Spanish, where \xFC can only appear in g\xFCe or g\xFCi`)}}var y=class{constructor(e="",s="",n="",i=!1,l=!1){this.onset=e,this.nucleus=s,this.coda=n,this.accented=i,this.stressed=l}get value(){return`${this.onset}${this.nucleus}${this.coda}`}},x=class{constructor(e,s,n=null,i=null){this.original=e,this.syllables=Object.freeze([...s]),this.stressed=n,this.accented=i,Object.freeze(this)}get hyphenated(){return this.syllables.map(e=>e.value).join("-")}hyphenate(e=!1){let s=n=>!n.stressed||!e?n.value:`>${n.value}<`;return this.syllables.map(s).join("-")}},c=class{constructor(e){this.originalWord=e,this.pos=0,this.accent=null,this.stressFound=!1,this.stressed=null,this.syllables=[],this.word=e.toLowerCase(),this.len=this.word.length}get char(){return this.word[this.pos]??null}get oneAhead(){return this.lookAhead(1)}lookAhead(e=1){return this.hasNext(e)?this.word[this.pos+e]:null}get oneBehind(){return this.lookBehind(1)}lookBehind(e=1){return this.pos-e>=0?this.word[this.pos-e]:null}get ended(){return this.pos>=this.len}get atEnd(){return this.pos===this.len-1}next(e=1){for(let s=0;s<e;s++){if(!this.hasNext())return this.pos=this.len,null;this.pos+=1}return this.char}previous(){return this.pos>0?(this.pos-=1,this.char):null}hasNext(e=1){return this.pos+e<this.len}at(e){return this.word.at(e)}addSyllable(){let e=new y;return this.syllables.push(e),e}get currentSyllable(){return this.syllables.length>0?this.syllables[this.syllables.length-1]:null}toResult(){if(!this.ended)throw new Error("Word is not ended");if(!this.stressFound)throw new Error("Stress is not found");return new x(this.originalWord,this.syllables,this.stressed,this.accent)}},h=class t{constructor(e){this.chars=e}static OPEN=new t("aeo");static OPEN_WITH_ACCENT=new t("\xE1\xE9\xF3");static CLOSED=new t("iu\xFC");static CLOSED_WITH_ACCENT=new t("\xED\xFA");static fromChar(e){if(e.toLowerCase()==="y")return t.CLOSED;if(r(e)){for(let s of[t.OPEN,t.OPEN_WITH_ACCENT,t.CLOSED,t.CLOSED_WITH_ACCENT])if(s.chars.includes(e))return s}throw new Error(`${e} is not a vowel`)}get hasAccent(){return this===t.OPEN_WITH_ACCENT||this===t.CLOSED_WITH_ACCENT}get isClosed(){return this===t.CLOSED||this===t.CLOSED_WITH_ACCENT}get isOpen(){return this===t.OPEN_WITH_ACCENT||this===t.OPEN}};var g=new Set([...p].filter(t=>t!=="y"));function A(t){let e=new c(t);for(;!e.ended;){let s=e.addSyllable(),n=e.pos;s.onset=W(e),s.nucleus=L(e),s.coda=k(e);let i=e.pos;s.accented=e.accent!==null&&n<=e.accent&&e.accent<i;let l=e.syllables.length;e.stressFound&&e.stressed===null&&(e.stressed=l-1)}return e.stressed=v(e),e.syllables[e.stressed].stressed=!0,e.stressFound=!0,e}function v(t){let e;if(t.stressFound){if(t.stressed===null)throw new Error("Stressed syllable is not set for accented word");return t.stressed}let s=t.syllables.length;if(s===1)e=s-1;else{let n=t.at(-1),i=t.at(-2);n==="y"?r(i,n)?e=s-1:e=s-2:r(n)||"ns".includes(n)&&r(i)?e=s-2:e=s-1}return e}function C(t){return function(s){let n=s.pos;t(s);let i=s.pos;return s.originalWord.slice(n,i)}}var W=C(function(e){for(;!e.ended&&g.has(e.char);)e.next();if(!e.ended&&e.oneBehind!==null){let s=e.oneBehind+e.char;(s==="qu"||s==="gu"&&"ei\xE9\xED".includes(String(e.oneAhead))||s==="g\xFC")&&e.next()}}),L=C(function(e){let s=e.pos;if(e.ended)throw new o("Syllable has no nucleus. Perhaps the word has no vowels?",e);if(e.char==="y"&&(r(e.char,e.oneAhead)||e.next()),e.ended)return;if(!r(e.char,e.oneAhead))throw new o("Nucleus expects a vowel!",e);let n=h.fromChar(e.char);if(n.hasAccent&&(e.accent=e.pos,e.stressFound=!0),e.next(),n===h.CLOSED_WITH_ACCENT)return;let i=e.char==="h";if(i&&e.next(),e.ended)return;if(s===e.pos)throw new o("Expected to move forward in first stage of nucleus. Perhaps invalid chars?",e);let l=n;if(!r(e.char,e.oneAhead))return;let a=h.fromChar(e.char);if(a.isOpen){if(l.isOpen){i&&e.previous();return}a.hasAccent&&(e.accent=e.pos,e.stressFound=!0),e.next()}else if(a===h.CLOSED_WITH_ACCENT){e.accent=e.pos,l.isClosed?(e.stressFound=!0,e.next()):i&&e.previous();return}else if(a===h.CLOSED){if(e.oneAhead!==null&&r(e.oneAhead,e.lookAhead(2))){i&&e.previous();return}e.char!==e.oneBehind&&e.next();return}e.ended||(e.char!==null&&"ui".includes(e.char)&&e.next(),e.char==="y"&&e.atEnd&&e.next())}),k=C(function(e){if(e.ended||r(e.char,e.oneAhead))return;if(e.atEnd){e.next();return}if(e.hasNext()&&r(e.oneAhead,e.lookAhead(2)))return;if(e.pos>=e.len-2){e.oneAhead!=="y"&&e.next(2);return}let s=e.char,n=e.lookAhead(1),i=e.lookAhead(2);if(r(i,e.lookAhead(3))){let l=s+n;if(l==="ll"||l==="ch"||l==="rr"||!"sr".includes(s)&&n==="h")return;if(n==="y"){if(r("y",e.lookAhead(2)))return;e.next();return}if(["gl","cl","kl","bl","vl","pl","fl","tl","gr","cr","kr","br","vr","pr","fr","tr","dr"].includes(l))return;e.next()}else{if(e.pos>=e.len-3){if(n==="y"&&r("y",e.lookAhead(2)))return;i==="y"?e.next():e.next(3);return}if(n==="y"&&r("y",e.lookAhead(2))){e.next();return}if(["pt","ct","cn","ps","mn","gn","ft","pn","cz","tz","ts"].includes(n+i)){e.next();return}"lry".includes(i)||n+i==="ch"?e.next():e.next(2)}});function u(t){return t=t.normalize("NFC"),S(t),A(t).toResult()}function m(t){return u(t).syllables.map(s=>s.value)}function N(t){return u(t).hyphenated}globalThis.jsilabeador=E;export{o as HyphenatorError,N as hyphenate,m as syllabify,u as syllabifyWithDetails};
+  </script>
+
+  <script type="module">
+    const { syllabifyWithDetails } = globalThis.jsilabeador;
+
+    const EXAMPLES = [
+      ["puerta", "diphthong"],
+      ["día", "hiatus"],
+      ["búho", "hiatus across h"],
+      ["buey", "triphthong"],
+      ["paraguay", "final triphthong"],
+      ["muy", "vocalic y"],
+      ["hoy", "vocalic y"],
+      ["ayer", "consonantal y"],
+      ["vergüenza", "diaeresis"],
+      ["prohibido", "h in the nucleus"],
+      ["camión", "written accent"],
+      ["música", "esdrújula"],
+      ["guitarra", "silent u"],
+      ["construir", "rising ui"],
+      ["aeropuerto", "hiatus + diphthong"],
+      ["subrayar", "prefix boundary"],
+    ];
+
+    const input = document.querySelector("#word");
+    const chips = document.querySelector("#chips");
+    const summary = document.querySelector("#summary");
+    const blocks = document.querySelector("#blocks");
+    const rows = document.querySelector("#rows");
+    const result = document.querySelector("#result");
+    const tableCard = document.querySelector("#table-card");
+    const errorCard = document.querySelector("#error-card");
+    const errorBox = document.querySelector("#error");
+
+    for (const [word, tag] of EXAMPLES) {
+      const chip = document.createElement("button");
+      chip.className = "chip";
+      chip.append(word);
+      const small = document.createElement("small");
+      small.textContent = tag;
+      chip.append(small);
+      chip.addEventListener("click", () => {
+        input.value = word;
+        analyze();
+      });
+      chips.append(chip);
+    }
+
+    const ORDINALS = ["1st", "2nd", "3rd"];
+    const ordinal = (n) => ORDINALS[n - 1] ?? `${n}th`;
+
+    function span(text, part) {
+      const s = document.createElement("span");
+      s.className = `part-${part}`;
+      s.textContent = text;
+      return s;
+    }
+
+    function analyze() {
+      const word = input.value.trim();
+      blocks.replaceChildren();
+      rows.replaceChildren();
+      summary.replaceChildren();
+      if (!word) {
+        result.classList.add("hidden");
+        tableCard.classList.add("hidden");
+        errorCard.classList.add("hidden");
+        return;
+      }
+      let details;
+      try {
+        details = syllabifyWithDetails(word);
+      } catch (error) {
+        result.classList.add("hidden");
+        tableCard.classList.add("hidden");
+        errorCard.classList.remove("hidden");
+        errorBox.textContent = `Not syllabifiable as Spanish: ${error.message}`;
+        return;
+      }
+      errorCard.classList.add("hidden");
+      result.classList.remove("hidden");
+      tableCard.classList.remove("hidden");
+
+      const syllables = details.syllables;
+      const stressedSyllable = syllables[details.stressed];
+
+      const hyph = document.createElement("span");
+      hyph.className = "hyph";
+      hyph.textContent = details.hyphenated;
+      summary.append(hyph);
+
+      const facts = [
+        ["syllables", String(syllables.length)],
+        ["stressed", `${ordinal(details.stressed + 1)} (${stressedSyllable.onset}${stressedSyllable.nucleus}${stressedSyllable.coda})`],
+        ["written accent", details.accented === null ? "none" : `“${details.original[details.accented]}” at letter ${details.accented + 1}`],
+      ];
+      for (const [label, value] of facts) {
+        const item = document.createElement("span");
+        item.append(`${label}: `);
+        const b = document.createElement("b");
+        b.textContent = value;
+        item.append(b);
+        summary.append(item);
+      }
+
+      syllables.forEach((syl, i) => {
+        const block = document.createElement("div");
+        block.className = "syllable" + (syl.stressed ? " stressed" : "");
+        if (syl.stressed) {
+          const badge = document.createElement("span");
+          badge.className = "badge";
+          badge.textContent = "tónica";
+          block.append(badge);
+        }
+        if (syl.onset) block.append(span(syl.onset, "onset"));
+        if (syl.nucleus) block.append(span(syl.nucleus, "nucleus"));
+        if (syl.coda) block.append(span(syl.coda, "coda"));
+        blocks.append(block);
+
+        const tr = document.createElement("tr");
+        const cells = [
+          [String(i + 1), "num"],
+          [syl.onset + syl.nucleus + syl.coda, ""],
+          [syl.onset || "—", syl.onset ? "mono-onset" : "empty"],
+          [syl.nucleus || "—", syl.nucleus ? "mono-nucleus" : "empty"],
+          [syl.coda || "—", syl.coda ? "mono-coda" : "empty"],
+          [syl.stressed ? "✓" : "", ""],
+          [syl.accented ? "✓" : "", ""],
+        ];
+        for (const [text, cls] of cells) {
+          const td = document.createElement("td");
+          if (cls) td.className = cls;
+          if (text === "✓") {
+            const tick = document.createElement("span");
+            tick.className = "tick";
+            tick.textContent = "✓";
+            td.append(tick);
+          } else {
+            td.textContent = text;
+          }
+          tr.append(td);
+        }
+        rows.append(tr);
+      });
+    }
+
+    input.addEventListener("input", analyze);
+    analyze();
+  </script>
+</body>
+</html>
