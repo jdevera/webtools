@@ -54,6 +54,22 @@ test('extractMeta collapses whitespace inside multi-line description', () => {
   assert.equal(extractMeta(html).description, 'Line one. Line two.');
 });
 
+test('extractMeta decodes HTML entities in the description', () => {
+  const html = `<title>X</title><p class="description">A website&rsquo;s icons &amp; files &mdash; local&nbsp;only.</p>`;
+  assert.equal(extractMeta(html).description, 'A website\u2019s icons & files \u2014 local only.');
+});
+
+test('extractMeta decodes numeric entities in title and description', () => {
+  const html = `<title>X&#39;s</title><p class="description">&#x2014; dash &#8230;</p>`;
+  assert.equal(extractMeta(html).title, "X's");
+  assert.equal(extractMeta(html).description, '\u2014 dash \u2026');
+});
+
+test('extractMeta leaves unknown entities untouched', () => {
+  const html = `<title>X</title><p class="description">&unknown; stays</p>`;
+  assert.equal(extractMeta(html).description, '&unknown; stays');
+});
+
 function makeToolsDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'webtools-tools-'));
 }

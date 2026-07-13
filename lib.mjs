@@ -4,14 +4,32 @@ import path from 'node:path';
 const TITLE_RE = /<title>([^<]+)<\/title>/i;
 const DESC_RE = /<p\s+class=["']description["'][^>]*>([\s\S]*?)<\/p>/i;
 
+// Tool pages are HTML, so extracted text may carry entities; decode them to
+// plain text here so renderIndex can escape exactly once.
+const NAMED_ENTITIES = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+  rsquo: '\u2019', lsquo: '\u2018', rdquo: '\u201d', ldquo: '\u201c',
+  mdash: '\u2014', ndash: '\u2013', hellip: '\u2026',
+};
+
+function decodeEntities(s) {
+  return s.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, body) => {
+    if (body[0] === '#') {
+      const code = body[1]?.toLowerCase() === 'x' ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+      return Number.isNaN(code) ? match : String.fromCodePoint(code);
+    }
+    return NAMED_ENTITIES[body.toLowerCase()] ?? match;
+  });
+}
+
 export function extractMeta(html) {
   const titleMatch = html.match(TITLE_RE);
   if (!titleMatch) throw new Error('missing <title>');
   const descMatch = html.match(DESC_RE);
   if (!descMatch) throw new Error('missing <p class="description">');
   return {
-    title: titleMatch[1].trim(),
-    description: descMatch[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim(),
+    title: decodeEntities(titleMatch[1]).trim(),
+    description: decodeEntities(descMatch[1].replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim(),
   };
 }
 

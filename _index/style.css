@@ -1,8 +1,19 @@
-body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; color: #222; }
-h1 { margin-bottom: 1.5rem; }
+:root {
+  --bg: #0f111a;
+  --panel: #151827;
+  --panel2: #101322;
+  --border: rgba(255,255,255,0.12);
+  --muted: rgba(255,255,255,0.7);
+  --text: #e6e6f0;
+  --accent: #A78BFA;
+}
+
+html { background: var(--bg); }
+body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; color: var(--text); }
+h1 { margin-bottom: 1.5rem; font-size: 1.4rem; font-weight: 800; letter-spacing: 0.02em; }
 .tools { list-style: none; padding: 0; margin: 0; }
 .tools li { margin: 0.5rem 0; }
-.tools a { display: block; padding: 0.75rem 1rem; border: 1px solid #ddd; border-radius: 6px; text-decoration: none; color: inherit; }
-.tools a:hover { background: #f5f5f5; }
+.tools a { display: block; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 10px; text-decoration: none; color: inherit; background: linear-gradient(180deg, var(--panel), var(--panel2)); }
+.tools a:hover { border-color: var(--accent); }
 .tools strong { display: block; margin-bottom: 0.25rem; }
-.tools small { color: #666; }
+.tools small { color: var(--muted); }
