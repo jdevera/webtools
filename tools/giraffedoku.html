@@ -19,7 +19,9 @@
       --good: #34D399;
     }
 
-    * { box-sizing: border-box; }
+    /* manipulation kills double-tap-to-zoom (keeps scroll and pinch); the board
+       overrides with none so drag-painting doesn't scroll the page */
+    * { box-sizing: border-box; touch-action: manipulation; }
     body {
       margin: 0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
