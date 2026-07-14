@@ -1374,6 +1374,9 @@ const Giraffe = (() => {
   };
 
   els.board.addEventListener('contextmenu', (e) => e.preventDefault());
+  // iOS Safari can double-tap-zoom even through touch-action:none; cancelling
+  // the native touchend is the only reliable block. Pointer events still fire.
+  els.board.addEventListener('touchend', (e) => e.preventDefault(), { passive: false });
 
   els.board.addEventListener('pointerdown', (e) => {
     if (press || solved || lost || !puzzle) return;
