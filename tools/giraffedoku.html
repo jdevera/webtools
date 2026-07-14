@@ -1,0 +1,1522 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Giraffedoku</title>
+  <style>
+    :root {
+      --pad: 14px;
+      --gap: 12px;
+      --border: rgba(255,255,255,0.12);
+      --muted: rgba(255,255,255,0.7);
+      --bg: #0f111a;
+      --panel: #151827;
+      --panel2: #101322;
+      --text: #e6e6f0;
+      --accent: #FBBF24;
+      --bad: #ef4444;
+      --good: #34D399;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 18px 18px 10px 18px;
+      display: flex;
+      gap: 16px;
+      align-items: baseline;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 { font-size: 16px; margin: 0; letter-spacing: 0.02em; font-weight: 800; }
+    header h1 span { color: var(--accent); }
+    header .description { color: var(--muted); font-size: 12px; margin: 0; }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap);
+      padding: 16px;
+      max-width: 720px;
+      width: 100%;
+      margin: 0 auto;
+      align-items: center;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+    }
+
+    button {
+      font: inherit;
+      font-size: 13px;
+      color: var(--text);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+    button:hover { border-color: var(--accent); }
+    button:disabled { opacity: 0.5; cursor: default; }
+    button:disabled:hover { border-color: var(--border); }
+
+    .tabs, .seg { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .tabs button, .seg button { border: none; border-radius: 0; background: transparent; }
+    .tabs button + button, .seg button + button { border-left: 1px solid var(--border); }
+    .tabs button.active, .seg button.active {
+      background: var(--panel);
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    label.toggle {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .statusline {
+      display: flex;
+      gap: 12px;
+      align-items: baseline;
+      flex-wrap: wrap;
+      justify-content: center;
+      min-height: 1.4em;
+      text-align: center;
+    }
+    #puzzle-label { font-size: 12px; color: var(--muted); letter-spacing: 0.04em; }
+
+    .messageline {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      min-height: 1.6em;
+      text-align: center;
+      max-width: min(92vw, 620px);
+    }
+    #message { font-size: 13px; color: var(--accent); }
+    #dismiss, #apply { font-size: 11px; padding: 2px 8px; }
+    #apply { border-color: var(--accent); }
+
+    #banner, #lost {
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      border: 1px solid var(--good);
+      border-radius: 12px;
+      padding: 10px 16px;
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      animation: pop 0.35s ease-out;
+    }
+    #lost { border-color: var(--bad); }
+    #banner[hidden], #lost[hidden] { display: none; }
+    #trees { font-size: 14px; letter-spacing: 2px; }
+    #trees .eaten, #modal-trees .eaten { opacity: 0.25; filter: grayscale(1); }
+    #timer { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    #overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    #overlay[hidden] { display: none; }
+    #win-modal {
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      border: 1px solid var(--good);
+      border-radius: 14px;
+      padding: 22px 30px;
+      text-align: center;
+      max-width: 320px;
+      animation: pop 0.35s ease-out;
+    }
+    #win-modal h2 { margin: 0 0 10px; font-size: 18px; }
+    #win-modal p { margin: 6px 0; font-size: 14px; color: var(--text); }
+    #win-modal #modal-ref { font-size: 12px; color: var(--muted); letter-spacing: 0.04em; }
+    #win-modal p[hidden] { display: none; }
+    #win-modal #modal-trees { font-size: 18px; letter-spacing: 3px; }
+    #win-modal button { margin-top: 12px; }
+    @keyframes pop { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    #board {
+      width: min(92vw, 620px);
+      border: 3px solid #0a0c12;
+      border-radius: 10px;
+      overflow: hidden;
+      touch-action: none;
+    }
+    #grid {
+      display: grid;
+      width: 100%;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #grid.busy { opacity: 0.45; pointer-events: none; }
+
+    .cell {
+      position: relative;
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--rc);
+    }
+    .cell .mark { line-height: 1; pointer-events: none; }
+    .cell.x-manual .mark { color: rgba(255,255,255,0.8); font-size: 1.45em; font-weight: 700; }
+    .cell.x-auto .mark { color: rgba(255,255,255,0.35); font-size: 1.45em; font-weight: 700; }
+    .cell.x-wrong .mark {
+      color: var(--bad);
+      font-size: 1.45em;
+      font-weight: 700;
+      text-shadow: -1px -1px 0 rgba(255,255,255,0.85), 1px -1px 0 rgba(255,255,255,0.85),
+                   -1px 1px 0 rgba(255,255,255,0.85), 1px 1px 0 rgba(255,255,255,0.85);
+    }
+
+    .cell.conflict::after,
+    .cell.hint::after {
+      content: '';
+      position: absolute;
+      inset: 2px;
+      border-radius: 8px;
+      pointer-events: none;
+    }
+    .cell.conflict::after { border: 3px solid var(--bad); animation: pulse 1s infinite; }
+    .cell.wrong::after {
+      content: '';
+      position: absolute;
+      inset: 2px;
+      border-radius: 8px;
+      border: 3px solid var(--bad);
+      pointer-events: none;
+    }
+    .cell.wrong .mark { animation: shake 0.5s ease; }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-12%); }
+      40%, 80% { transform: translateX(12%); }
+    }
+    .cell.hint::after { border: 3px solid var(--accent); }
+    .cell.hint-x::before {
+      content: '✕';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.45em;
+      font-weight: 700;
+      color: rgba(251,191,36,0.8);
+      pointer-events: none;
+    }
+    .cell.hint-ctx::after {
+      content: '';
+      position: absolute;
+      inset: 2px;
+      border-radius: 8px;
+      border: 2px dashed rgba(251,191,36,0.55);
+      pointer-events: none;
+    }
+    @keyframes pulse { 50% { opacity: 0.45; } }
+
+    #grid.solved .cell.giraffe .mark { animation: bounce 0.7s ease; }
+    @keyframes bounce {
+      0% { transform: translateY(0); }
+      35% { transform: translateY(-18%) scale(1.15); }
+      70% { transform: translateY(0) scale(1); }
+      85% { transform: translateY(-6%); }
+      100% { transform: translateY(0); }
+    }
+
+    footer {
+      padding: 10px 18px 16px 18px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    footer .rule { color: var(--text); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Giraffe<span>doku</span> 🦒</h1>
+    <p class="description">
+      A giraffe-herding logic puzzle. Place one giraffe in every row, every column and
+      every paddock — but never let two giraffes stand next to each other, not even
+      diagonally, or their necks will tangle. A shared daily puzzle plus endless free
+      play in three difficulties, every board with exactly one solution.
+    </p>
+  </header>
+
+  <main>
+    <div class="controls">
+      <div class="tabs">
+        <button id="tab-daily">Daily</button>
+        <button id="tab-free">Free play</button>
+      </div>
+      <div class="seg" id="diff" hidden>
+        <button data-d="easy">Easy</button>
+        <button data-d="medium">Medium</button>
+        <button data-d="hard">Hard</button>
+      </div>
+      <button id="new" hidden>New puzzle</button>
+      <label class="toggle"><input type="checkbox" id="autox" /> Auto-✕</label>
+      <button id="undo-btn" disabled>Undo</button>
+      <button id="reset-btn">Reset</button>
+    </div>
+
+    <div class="statusline">
+      <span id="puzzle-label"></span>
+      <span id="trees"></span>
+      <span id="timer" hidden></span>
+    </div>
+
+    <div id="banner" hidden>
+      <span>🎉 All necks untangled!</span>
+      <button id="again">Another herd</button>
+    </div>
+
+    <div id="lost" hidden>
+      <span>🌳 The herd ate all your trees!</span>
+      <button id="restart">Start over</button>
+    </div>
+
+    <div id="board"><div id="grid"></div></div>
+
+    <div id="overlay" hidden>
+      <div id="win-modal">
+        <h2>🎉 You did it!</h2>
+        <p id="modal-ref"></p>
+        <p id="modal-time"></p>
+        <p id="modal-trees"></p>
+        <p id="modal-hints"></p>
+        <button id="modal-close">Close</button>
+      </div>
+    </div>
+
+    <div class="messageline">
+      <button id="hint-btn">Hint</button>
+      <span id="message"></span>
+      <button id="apply" hidden>Apply</button>
+      <button id="dismiss" hidden>Dismiss</button>
+    </div>
+  </main>
+
+  <footer>
+    <span class="rule">How to play:</span> tap a cell to mark it with ✕ (no giraffe here),
+    tap twice to place or remove a giraffe, and drag across cells to paint or erase ✕ marks.
+    Auto-✕ crosses off everything a placed giraffe rules out. The hint button explains the
+    next logical deduction. You start with three trees: place a giraffe where none belongs
+    and the herd eats one — lose all three and you must start the puzzle over.
+  </footer>
+
+  <script id="engine">
+"use strict";
+const Giraffe = (() => {
+  // ---------- seeded RNG ----------
+  function xmur3(str) {
+    let h = 1779033703 ^ str.length;
+    for (let i = 0; i < str.length; i++) {
+      h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+      h = (h << 13) | (h >>> 19);
+    }
+    return () => {
+      h = Math.imul(h ^ (h >>> 16), 2246822507);
+      h = Math.imul(h ^ (h >>> 13), 3266489909);
+      return (h ^= h >>> 16) >>> 0;
+    };
+  }
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const rngFromString = (s) => mulberry32(xmur3(s)());
+
+  function shuffled(arr, rng) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // ---------- solution placement ----------
+  // One giraffe per row and column, consecutive rows at column distance >= 2
+  // (giraffes two or more rows apart can never touch).
+  function randomPlacement(n, rng) {
+    const cols = new Array(n).fill(-1);
+    const used = new Array(n).fill(false);
+    const range = Array.from({ length: n }, (_, i) => i);
+    function bt(row) {
+      if (row === n) return true;
+      for (const c of shuffled(range, rng)) {
+        if (used[c]) continue;
+        if (row > 0 && Math.abs(c - cols[row - 1]) <= 1) continue;
+        cols[row] = c; used[c] = true;
+        if (bt(row + 1)) return true;
+        used[c] = false; cols[row] = -1;
+      }
+      return false;
+    }
+    return bt(0) ? cols : null;
+  }
+
+  // ---------- region growth ----------
+  // Seed one region on each solution giraffe, then flood-grow at random until
+  // the board is partitioned. Regions stay orthogonally connected by construction.
+  function growRegions(n, cols, rng) {
+    const regions = new Array(n * n).fill(-1);
+    for (let r = 0; r < n; r++) regions[r * n + cols[r]] = r;
+    let unassigned = n * n - n;
+    while (unassigned > 0) {
+      const edges = [];            // [targetCell, regionId]
+      const byRegion = new Map();
+      for (let i = 0; i < n * n; i++) {
+        if (regions[i] === -1) continue;
+        const r = Math.floor(i / n), c = i % n;
+        const tryAdd = (j) => {
+          if (regions[j] !== -1) return;
+          edges.push([j, regions[i]]);
+          if (!byRegion.has(regions[i])) byRegion.set(regions[i], []);
+          byRegion.get(regions[i]).push(j);
+        };
+        if (c > 0) tryAdd(i - 1);
+        if (c < n - 1) tryAdd(i + 1);
+        if (r > 0) tryAdd(i - n);
+        if (r < n - 1) tryAdd(i + n);
+      }
+      let cell, reg;
+      if (rng() < 0.5) {
+        // uniform over regions that can still grow: keeps sizes comparable
+        const regs = [...byRegion.keys()];
+        reg = regs[Math.floor(rng() * regs.length)];
+        const opts = byRegion.get(reg);
+        cell = opts[Math.floor(rng() * opts.length)];
+      } else {
+        // uniform over frontier edges: lets big irregular shapes happen
+        [cell, reg] = edges[Math.floor(rng() * edges.length)];
+      }
+      regions[cell] = reg;
+      unassigned--;
+    }
+    return regions;
+  }
+
+  // ---------- uniqueness refinement ----------
+  // Random partitions almost never have a unique solution. Local search fixes
+  // that: move boundary cells between adjacent regions, keeping every region
+  // connected and its solution giraffe in place, and accept moves that do not
+  // increase the solution count. Plateau "kicks" escape local minima.
+  function connectedWithout(regions, n, g, removed) {
+    const cells = [];
+    for (let i = 0; i < n * n; i++) if (regions[i] === g && i !== removed) cells.push(i);
+    if (cells.length === 0) return false;
+    const seen = new Set([cells[0]]);
+    const queue = [cells[0]];
+    while (queue.length) {
+      const i = queue.pop();
+      const r = Math.floor(i / n), c = i % n;
+      for (const j of [c > 0 ? i - 1 : -1, c < n - 1 ? i + 1 : -1, r > 0 ? i - n : -1, r < n - 1 ? i + n : -1]) {
+        if (j >= 0 && j !== removed && regions[j] === g && !seen.has(j)) { seen.add(j); queue.push(j); }
+      }
+    }
+    return seen.size === cells.length;
+  }
+  function boundaryMoves(n, regions, cats) {
+    const moves = [];
+    for (let i = 0; i < n * n; i++) {
+      if (cats.has(i)) continue;
+      const r = Math.floor(i / n), c = i % n;
+      const neigh = [];
+      if (c > 0) neigh.push(i - 1);
+      if (c < n - 1) neigh.push(i + 1);
+      if (r > 0) neigh.push(i - n);
+      if (r < n - 1) neigh.push(i + n);
+      for (const t of new Set(neigh.map((j) => regions[j]).filter((g) => g !== regions[i]))) {
+        moves.push([i, t]);
+      }
+    }
+    return moves;
+  }
+  function refineToUnique(n, cols, regions, rng, maxIters = 1200, cap = 40) {
+    regions = regions.slice();
+    const cats = new Set(cols.map((c, r) => r * n + c));
+    let count = countSolutions(n, regions, cap);
+    let kicks = 8;
+    for (let it = 0; it < maxIters && count > 1; it++) {
+      const moves = shuffled(boundaryMoves(n, regions, cats), rng);
+      let accepted = false;
+      for (const [cell, target] of moves.slice(0, 40)) {
+        const src = regions[cell];
+        if (!connectedWithout(regions, n, src, cell)) continue;
+        regions[cell] = target;
+        const c2 = countSolutions(n, regions, cap);
+        if (c2 <= count) { count = c2; accepted = true; break; }
+        regions[cell] = src;
+      }
+      if (!accepted) {
+        if (kicks-- <= 0) break;
+        for (const [cell, target] of moves) {
+          if (!connectedWithout(regions, n, regions[cell], cell)) continue;
+          regions[cell] = target;
+          count = countSolutions(n, regions, cap);
+          break;
+        }
+      }
+    }
+    return count === 1 ? regions : null;
+  }
+
+  // ---------- geometry ----------
+  function makeGeom(n, regions) {
+    const rows = [], cols = [], regs = [];
+    for (let i = 0; i < n; i++) { rows.push([]); cols.push([]); regs.push([]); }
+    for (let i = 0; i < n * n; i++) {
+      const r = Math.floor(i / n), c = i % n;
+      rows[r].push(i); cols[c].push(i); regs[regions[i]].push(i);
+    }
+    const elim = [];
+    for (let i = 0; i < n * n; i++) {
+      const r = Math.floor(i / n), c = i % n;
+      const set = new Set();
+      for (const j of rows[r]) set.add(j);
+      for (const j of cols[c]) set.add(j);
+      for (const j of regs[regions[i]]) set.add(j);
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        const rr = r + dr, cc = c + dc;
+        if (rr >= 0 && rr < n && cc >= 0 && cc < n) set.add(rr * n + cc);
+      }
+      set.delete(i);
+      elim.push([...set]);
+    }
+    const groups = [];
+    for (let i = 0; i < n; i++) groups.push({ kind: 'region', index: i, cells: regs[i] });
+    for (let i = 0; i < n; i++) groups.push({ kind: 'row', index: i, cells: rows[i] });
+    for (let i = 0; i < n; i++) groups.push({ kind: 'col', index: i, cells: cols[i] });
+    return { n, regions, rows, cols, regs, elim, groups };
+  }
+
+  // ---------- counting solver (uniqueness) ----------
+  function countSolutions(n, regions, limit = 2) {
+    const maxRow = new Array(n).fill(-1);
+    for (let i = 0; i < n * n; i++) {
+      const r = Math.floor(i / n);
+      if (r > maxRow[regions[i]]) maxRow[regions[i]] = r;
+    }
+    let count = 0;
+    const usedCol = new Array(n).fill(false);
+    const usedReg = new Array(n).fill(false);
+    function bt(row, prevCol) {
+      if (count >= limit) return;
+      if (row === n) { count++; return; }
+      for (let g = 0; g < n; g++) if (!usedReg[g] && maxRow[g] < row) return;
+      for (let c = 0; c < n; c++) {
+        if (usedCol[c]) continue;
+        if (prevCol >= 0 && Math.abs(c - prevCol) <= 1) continue;
+        const g = regions[row * n + c];
+        if (usedReg[g]) continue;
+        usedCol[c] = true; usedReg[g] = true;
+        bt(row + 1, c);
+        usedCol[c] = false; usedReg[g] = false;
+        if (count >= limit) return;
+      }
+    }
+    bt(0, -1);
+    return count;
+  }
+
+  // ---------- logic solver (rating + hints) ----------
+  // cand values: 0 = open, 1 = eliminated, 2 = giraffe
+  function newState(geom) {
+    return { geom, cand: new Uint8Array(geom.n * geom.n), placed: 0 };
+  }
+  function cloneState(state) {
+    return { geom: state.geom, cand: state.cand.slice(), placed: state.placed };
+  }
+  function placeAt(state, idx) {
+    state.cand[idx] = 2;
+    for (const j of state.geom.elim[idx]) if (state.cand[j] === 0) state.cand[j] = 1;
+    state.placed++;
+  }
+  function applyStep(state, step) {
+    if (step.type === 'place') placeAt(state, step.cell);
+    else for (const c of step.cells) state.cand[c] = 1;
+  }
+  const satisfied = (state, g) => g.cells.some((c) => state.cand[c] === 2);
+  const openCells = (state, g) => g.cells.filter((c) => state.cand[c] === 0);
+
+  function* combos(arr, k, start = 0, cur = []) {
+    if (cur.length === k) { yield cur.slice(); return; }
+    for (let i = start; i <= arr.length - (k - cur.length); i++) {
+      cur.push(arr[i]);
+      yield* combos(arr, k, i + 1, cur);
+      cur.pop();
+    }
+  }
+
+  function hasContradiction(state) {
+    for (const g of state.geom.groups) {
+      if (!satisfied(state, g) && openCells(state, g).length === 0) return true;
+    }
+    return false;
+  }
+
+  function findStep(state, maxTier = 3) {
+    const { geom } = state;
+    const n = geom.n;
+
+    // tier 1: a group with a single open cell
+    for (const g of geom.groups) {
+      if (satisfied(state, g)) continue;
+      const open = openCells(state, g);
+      if (open.length === 1) {
+        return { type: 'place', tier: 1, rule: 'single', cell: open[0], why: g };
+      }
+    }
+    // tier 1: all of a region's open cells share a row/column
+    for (let g = 0; g < n; g++) {
+      const grp = geom.groups[g];
+      if (satisfied(state, grp)) continue;
+      const open = openCells(state, grp);
+      if (open.length < 2) continue;
+      const rowsIn = new Set(open.map((c) => Math.floor(c / n)));
+      if (rowsIn.size === 1) {
+        const r = [...rowsIn][0];
+        const cells = geom.rows[r].filter((c) => state.cand[c] === 0 && geom.regions[c] !== g);
+        if (cells.length) return { type: 'elim', tier: 1, rule: 'region-in-line', cells, region: g, axis: 'row', line: r };
+      }
+      const colsIn = new Set(open.map((c) => c % n));
+      if (colsIn.size === 1) {
+        const cc = [...colsIn][0];
+        const cells = geom.cols[cc].filter((c) => state.cand[c] === 0 && geom.regions[c] !== g);
+        if (cells.length) return { type: 'elim', tier: 1, rule: 'region-in-line', cells, region: g, axis: 'column', line: cc };
+      }
+    }
+    if (maxTier < 2) return null;
+
+    // tier 2: all of a row's/column's open cells belong to one region
+    for (const axis of ['row', 'column']) {
+      const lines = axis === 'row' ? geom.rows : geom.cols;
+      for (let li = 0; li < n; li++) {
+        const grp = geom.groups[(axis === 'row' ? n : 2 * n) + li];
+        if (satisfied(state, grp)) continue;
+        const open = openCells(state, grp);
+        if (open.length < 2) continue;
+        const regsIn = new Set(open.map((c) => geom.regions[c]));
+        if (regsIn.size === 1) {
+          const g = [...regsIn][0];
+          const cells = geom.regs[g].filter((c) => state.cand[c] === 0 && !lines[li].includes(c));
+          if (cells.length) return { type: 'elim', tier: 2, rule: 'line-in-region', cells, region: g, axis, line: li };
+        }
+      }
+    }
+    // tier 2: cells blocked by every possible placement of a region
+    for (let g = 0; g < n; g++) {
+      const grp = geom.groups[g];
+      if (satisfied(state, grp)) continue;
+      const open = openCells(state, grp);
+      if (open.length < 2) continue;
+      let inter = null;
+      for (const p of open) {
+        const set = new Set(geom.elim[p].filter((q) => state.cand[q] === 0 && geom.regions[q] !== g));
+        inter = inter === null ? set : new Set([...inter].filter((x) => set.has(x)));
+        if (inter.size === 0) break;
+      }
+      if (inter && inter.size) {
+        return { type: 'elim', tier: 2, rule: 'common-elim', cells: [...inter], region: g };
+      }
+    }
+    if (maxTier < 3) return null;
+
+    // tier 3: k regions confined to k rows/columns (pigeonhole)
+    for (const axis of ['row', 'column']) {
+      const unsat = [];
+      for (let g = 0; g < n; g++) {
+        const grp = geom.groups[g];
+        if (satisfied(state, grp)) continue;
+        const open = openCells(state, grp);
+        const lines = new Set(open.map((c) => (axis === 'row' ? Math.floor(c / n) : c % n)));
+        unsat.push({ g, lines });
+      }
+      for (let k = 2; k <= Math.min(4, unsat.length); k++) {
+        for (const combo of combos(unsat, k)) {
+          const union = new Set();
+          for (const u of combo) for (const l of u.lines) union.add(l);
+          if (union.size !== k) continue;
+          const inCombo = new Set(combo.map((u) => u.g));
+          const cells = [];
+          for (const l of union) {
+            const lineCells = axis === 'row' ? geom.rows[l] : geom.cols[l];
+            for (const c of lineCells) {
+              if (state.cand[c] === 0 && !inCombo.has(geom.regions[c])) cells.push(c);
+            }
+          }
+          if (cells.length) {
+            return {
+              type: 'elim', tier: 3, rule: 'pigeonhole', cells,
+              regionSet: [...inCombo], axis, lines: [...union],
+            };
+          }
+        }
+      }
+    }
+    // tier 3: hypothetical placement leads to a dead group
+    for (let i = 0; i < n * n; i++) {
+      if (state.cand[i] !== 0) continue;
+      const sim = cloneState(state);
+      placeAt(sim, i);
+      let s;
+      while (!hasContradiction(sim) && (s = findStep(sim, 1))) applyStep(sim, s);
+      if (hasContradiction(sim)) {
+        const dead = sim.geom.groups.find((g) => !satisfied(sim, g) && openCells(sim, g).length === 0);
+        return {
+          type: 'elim', tier: 3, rule: 'contradiction', cells: [i],
+          dead: { kind: dead.kind, index: dead.index },
+        };
+      }
+    }
+    return null;
+  }
+
+  // Simulate a human solving with logic only. Rating = hardest tier needed.
+  function ratePuzzle(geom) {
+    const state = newState(geom);
+    let tier = 1;
+    const steps = [];
+    for (;;) {
+      if (state.placed === geom.n) return { solved: true, tier, steps };
+      const step = findStep(state, 3);
+      if (!step) return { solved: false, tier, steps };
+      applyStep(state, step);
+      if (step.tier > tier) tier = step.tier;
+      steps.push({ tier: step.tier, rule: step.rule });
+    }
+  }
+
+  // ---------- generation ----------
+  // A puzzle only *feels* hard if it forces tier-3 reasoning repeatedly, not
+  // once: hard puzzles must need at least HARD_MIN_T3 tier-3 deductions.
+  const HARD_MIN_T3 = 4;
+
+  // -1 if not unique / not logic-solvable, else tier-3 steps weighted over tier-2
+  function hardnessScore(n, regions) {
+    if (countSolutions(n, regions, 2) !== 1) return -1;
+    const r = ratePuzzle(makeGeom(n, regions));
+    if (!r.solved) return -1;
+    const t3 = r.steps.filter((s) => s.tier === 3).length;
+    const t2 = r.steps.filter((s) => s.tier === 2).length;
+    return t3 * 100 + t2;
+  }
+
+  // sizes: candidate grid sizes; targetTier: 1 easy / 2 medium / 3 hard.
+  function createGenerator(sizes, targetTier, seedStr, maxAttempts = 60) {
+    const rng = rngFromString(seedStr);
+    const n = sizes[Math.floor(rng() * sizes.length)];
+    let attempts = 0;
+    let best = null;      // fallback: {regions, solution, tier, score}
+    let hardening = null; // hardness hill-climb in progress: {regions, solution, cats, score, iters}
+    const wantHard = targetTier === 3;
+
+    function build(candidate, exact) {
+      return {
+        n, regions: candidate.regions, solution: candidate.solution,
+        tier: candidate.tier, exact, seed: seedStr, attempts,
+      };
+    }
+    function trackBest(cand) {
+      const better = wantHard
+        ? !best || cand.score > best.score
+        : !best || Math.abs(cand.tier - targetTier) < Math.abs(best.tier - targetTier);
+      if (better) best = cand;
+    }
+    function finishIfDry() {
+      if (attempts >= maxAttempts && !hardening) {
+        return { done: true, attempts, result: best ? build(best, false) : null };
+      }
+      return null;
+    }
+    // one hill-climb iteration on the hardness score; returns final result if target met
+    function hardenIteration() {
+      const h = hardening;
+      let accepted = false;
+      for (const [cell, target] of shuffled(boundaryMoves(n, h.regions, h.cats), rng).slice(0, 10)) {
+        const src = h.regions[cell];
+        if (!connectedWithout(h.regions, n, src, cell)) continue;
+        h.regions[cell] = target;
+        const s2 = hardnessScore(n, h.regions);
+        if (s2 >= h.score) { h.score = s2; accepted = true; break; }
+        h.regions[cell] = src;
+      }
+      h.iters++;
+      if (h.score >= HARD_MIN_T3 * 100) {
+        const cand = { regions: h.regions, solution: h.solution, tier: 3, score: h.score };
+        hardening = null;
+        return { done: true, attempts, result: build(cand, true) };
+      }
+      if (!accepted || h.iters >= 40) {
+        if (h.score >= 0) {
+          trackBest({ regions: h.regions, solution: h.solution, tier: h.score >= 100 ? 3 : 2, score: h.score });
+        }
+        hardening = null;
+      }
+      return null;
+    }
+
+    return {
+      step(batch = 25) {
+        let work = batch;
+        while (work-- > 0) {
+          if (hardening) {
+            const r = hardenIteration();
+            if (r) return r;
+            continue;
+          }
+          const dry = finishIfDry();
+          if (dry) return dry;
+          attempts++;
+          const solution = randomPlacement(n, rng);
+          const regions = refineToUnique(n, solution, growRegions(n, solution, rng), rng);
+          if (!regions) continue;
+          const rating = ratePuzzle(makeGeom(n, regions));
+          if (!rating.solved) continue;
+          const t3 = rating.steps.filter((s) => s.tier === 3).length;
+          const cand = { regions, solution, tier: rating.tier, score: t3 * 100 + rating.steps.filter((s) => s.tier === 2).length };
+          if (!wantHard) {
+            if (rating.tier === targetTier) return { done: true, attempts, result: build(cand, true) };
+            trackBest(cand);
+            continue;
+          }
+          if (t3 >= HARD_MIN_T3) return { done: true, attempts, result: build(cand, true) };
+          trackBest(cand);
+          if (rating.tier === 3) {
+            hardening = {
+              regions: regions.slice(), solution, score: cand.score, iters: 0,
+              cats: new Set(solution.map((c, r) => r * n + c)),
+            };
+          }
+        }
+        return { done: false, attempts, phase: hardening ? 'harden' : 'search', result: null };
+      },
+    };
+  }
+  function generate(sizes, targetTier, seedStr, maxAttempts = 60) {
+    const gen = createGenerator(sizes, targetTier, seedStr, maxAttempts);
+    for (;;) {
+      const r = gen.step(10);
+      if (r.done) return r.result;
+    }
+  }
+
+  // ---------- hints ----------
+  function describeGroup(g, names) {
+    if (g.kind === 'region') return `the ${names[g.index]} paddock`;
+    return `${g.kind === 'row' ? 'row' : 'column'} ${g.index + 1}`;
+  }
+  function stepText(step, names, geom) {
+    const n = geom.n;
+    const lineName = (axis, l) => `${axis} ${l + 1}`;
+    switch (step.rule) {
+      case 'single':
+        return `${describeGroup(step.why, names)} has only one free cell left — that is where its giraffe goes.`;
+      case 'region-in-line':
+        return `All free cells of the ${names[step.region]} paddock sit in ${lineName(step.axis, step.line)}, so the rest of that ${step.axis} can be crossed off.`;
+      case 'line-in-region':
+        return `Every free cell of ${lineName(step.axis, step.line)} belongs to the ${names[step.region]} paddock, so that paddock's other cells can be crossed off.`;
+      case 'common-elim':
+        return `Wherever the ${names[step.region]} paddock's giraffe ends up, these cells are always blocked — cross them off.`;
+      case 'pigeonhole':
+        return `${step.regionSet.length} paddocks (${step.regionSet.map((g) => names[g]).join(', ')}) fit entirely inside ${step.regionSet.length} ${step.axis}s — no other paddock can use those ${step.axis}s.`;
+      case 'contradiction': {
+        const c = step.cells[0];
+        const victim = describeGroup(step.dead, names);
+        return `A giraffe at row ${Math.floor(c / n) + 1}, column ${(c % n) + 1} would take away every cell ${step.dead.kind === 'region' ? 'of' : 'left in'} ${victim} — so no giraffe can stand here. Cross it off.`;
+      }
+      default:
+        return 'The next step follows logically.';
+    }
+  }
+  // board: { giraffes: [idx], xs: [idx] }
+  function hint(geom, solution, board, names) {
+    const n = geom.n;
+    const solSet = new Set(solution.map((c, r) => r * n + c));
+    for (const g of board.giraffes) {
+      if (!solSet.has(g)) {
+        return { type: 'removeGiraffe', cells: [g], text: 'This giraffe is standing in the wrong spot — remove it.' };
+      }
+    }
+    for (const x of board.xs) {
+      if (solSet.has(x)) {
+        return { type: 'removeX', cells: [x], text: 'This ✕ is crossing off a cell where a giraffe actually lives — remove it.' };
+      }
+    }
+    const state = newState(geom);
+    for (const g of board.giraffes) placeAt(state, g);
+    for (const x of board.xs) if (state.cand[x] === 0) state.cand[x] = 1;
+    const step = findStep(state, 3);
+    if (step) {
+      const text = stepText(step, names, geom);
+      let context = [];
+      if (step.rule === 'contradiction') {
+        const lists = { region: geom.regs, row: geom.rows, col: geom.cols };
+        context = lists[step.dead.kind][step.dead.index];
+      } else if (step.rule === 'pigeonhole') {
+        context = step.regionSet.flatMap((g) => geom.regs[g]);
+      } else if (step.region !== undefined) {
+        context = geom.regs[step.region];
+      }
+      return {
+        type: step.type,
+        cells: step.type === 'place' ? [step.cell] : step.cells,
+        context: context.filter((c) => !step.cells.includes(c)),
+        text: text.charAt(0).toUpperCase() + text.slice(1),
+      };
+    }
+    for (const s of solSet) {
+      if (!board.giraffes.includes(s)) {
+        return { type: 'reveal', cells: [s], text: 'No simple deduction applies here — but a giraffe definitely lives in this cell.' };
+      }
+    }
+    return null;
+  }
+
+  return {
+    rngFromString, randomPlacement, growRegions, refineToUnique, makeGeom,
+    countSolutions, ratePuzzle, findStep, newState, placeAt,
+    createGenerator, generate, hint,
+  };
+})();
+  </script>
+
+  <script>
+"use strict";
+(() => {
+  const E = Giraffe;
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    tabDaily: $('tab-daily'), tabFree: $('tab-free'), diff: $('diff'),
+    newBtn: $('new'), autox: $('autox'), hintBtn: $('hint-btn'),
+    undoBtn: $('undo-btn'), resetBtn: $('reset-btn'),
+    label: $('puzzle-label'), message: $('message'), banner: $('banner'),
+    again: $('again'), board: $('board'), grid: $('grid'),
+    trees: $('trees'), lost: $('lost'), restart: $('restart'),
+    dismiss: $('dismiss'), apply: $('apply'), timer: $('timer'),
+    overlay: $('overlay'), modalTime: $('modal-time'), modalTrees: $('modal-trees'),
+    modalClose: $('modal-close'), modalRef: $('modal-ref'), modalHints: $('modal-hints'),
+  };
+  const MAX_TREES = 3;
+
+  // hues spread and lightness alternated so any two regions stay apart
+  // (min pairwise OKLab ΔE ≈ 9); thick region borders are the fallback encoding
+  const PALETTE = [
+    { color: 'hsl(2 55% 30%)', name: 'red' },
+    { color: 'hsl(232 50% 29%)', name: 'blue' },
+    { color: 'hsl(135 50% 31%)', name: 'green' },
+    { color: 'hsl(50 85% 25%)', name: 'gold' },
+    { color: 'hsl(272 45% 46%)', name: 'purple' },
+    { color: 'hsl(178 70% 21%)', name: 'teal' },
+    { color: 'hsl(25 65% 41%)', name: 'orange' },
+    { color: 'hsl(320 60% 29%)', name: 'magenta' },
+    { color: 'hsl(24 32% 20%)', name: 'brown' },
+    { color: 'hsl(235 9% 52%)', name: 'slate' },
+    { color: 'hsl(201 60% 41%)', name: 'sky' },
+  ];
+
+  const DIFFS = {
+    easy: { sizes: [6, 7], tier: 1 },
+    medium: { sizes: [8, 9], tier: 2 },
+    hard: { sizes: [10, 11], tier: 3 },
+  };
+  const DAILY = { sizes: [8], tier: 2 };
+
+  // ---------- state ----------
+  let mode = 'daily';           // 'daily' | 'free'
+  let difficulty = 'medium';
+  let puzzle = null;            // {n, regions, solution, tier, seed}
+  let geom = null;
+  let solutionSet = new Set();  // solution as cell indices
+  let giraffes = new Set();
+  let manualX = new Set();
+  let wrongX = new Set();       // permanent red ✕ from wrong giraffe placements
+  let autoCount = null;         // Int16Array: how many giraffes imply an X here
+  let solved = false;
+  let lost = false;
+  let trees = MAX_TREES;
+  let cells = [];
+  let hintsUsed = new Set(); // distinct hints requested this run
+  let genToken = 0;
+  let hintTimer = null;
+  let wrongTimer = null;
+
+  const localDate = () => {
+    const d = new Date();
+    const p = (x) => String(x).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  };
+  const randomSeed = () => Math.random().toString(36).slice(2, 8);
+
+  // ---------- generation ----------
+  async function newPuzzle(seed) {
+    const cfg = mode === 'daily' ? DAILY : DIFFS[difficulty];
+    const token = ++genToken;
+    els.grid.classList.add('busy');
+    els.banner.hidden = true;
+    els.lost.hidden = true;
+    setMessage('Herding giraffes…');
+    let result = null;
+    // deterministic retry rounds in the (rare) case a seed yields nothing
+    for (let round = 0; round < 3 && !result; round++) {
+      const roundSeed = round === 0 ? seed : `${seed}#${round + 1}`;
+      const gen = E.createGenerator(cfg.sizes, cfg.tier, roundSeed);
+      const batch = Math.max(...cfg.sizes) >= 10 ? 1 : 5;
+      for (;;) {
+        const r = gen.step(batch);
+        if (token !== genToken) return; // superseded by a newer request
+        if (r.done) { result = r.result; break; }
+        setMessage(r.phase === 'harden'
+          ? 'Tangling the necks a little harder…'
+          : `Herding giraffes… (attempt ${r.attempts})`);
+        await new Promise((res) => setTimeout(res));
+      }
+    }
+    if (!result) { setMessage('Could not build a puzzle — try again.'); return; }
+    puzzle = result;
+    geom = E.makeGeom(puzzle.n, puzzle.regions);
+    solutionSet = new Set(puzzle.solution.map((c, r) => r * puzzle.n + c));
+    resetBoard();
+    buildGrid();
+    updateLabel();
+    updateUrl();
+    els.grid.classList.remove('busy');
+    if (mode === 'daily') startTimer(); else hideTimer();
+  }
+
+  function resetBoard() {
+    giraffes = new Set();
+    manualX = new Set();
+    wrongX = new Set();
+    autoCount = new Int16Array(puzzle.n * puzzle.n);
+    solved = false;
+    lost = false;
+    trees = MAX_TREES;
+    els.banner.hidden = true;
+    els.lost.hidden = true;
+    els.grid.classList.remove('solved');
+    els.overlay.hidden = true;
+    hintsUsed = new Set();
+    undoStack = [];
+    updateUndoBtn();
+    setMessage('');
+    renderTrees();
+    if (mode === 'daily' && puzzle) startTimer();
+  }
+
+  // ---------- daily timer ----------
+  let timerStart = null;
+  let timerTick = null;
+  function fmtTime(ms) {
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const h = Math.floor(m / 60);
+    const p = (x) => String(x).padStart(2, '0');
+    return h ? `${h}:${p(m % 60)}:${p(s % 60)}` : `${m}:${p(s % 60)}`;
+  }
+  function startTimer() {
+    stopTimer();
+    timerStart = Date.now();
+    els.timer.hidden = false;
+    els.timer.textContent = '⏱ 0:00';
+    timerTick = setInterval(() => {
+      els.timer.textContent = `⏱ ${fmtTime(Date.now() - timerStart)}`;
+    }, 1000);
+  }
+  function stopTimer() {
+    if (timerTick) { clearInterval(timerTick); timerTick = null; }
+  }
+  function hideTimer() {
+    stopTimer();
+    els.timer.hidden = true;
+    timerStart = null;
+  }
+
+  function renderTrees() {
+    els.trees.innerHTML =
+      '🌳'.repeat(trees) + (trees < MAX_TREES ? `<span class="eaten">${'🌳'.repeat(MAX_TREES - trees)}</span>` : '');
+  }
+
+  function puzzleRef() {
+    const size = `${puzzle.n}×${puzzle.n}`;
+    if (mode === 'daily') {
+      const date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      return `Daily · ${date} · ${size} · medium`;
+    }
+    const tierNote = puzzle.exact ? difficulty : `${difficulty} (closest fit)`;
+    return `Free play · ${tierNote} · ${size} · seed ${puzzle.seed}`;
+  }
+  function updateLabel() {
+    els.label.textContent = puzzleRef();
+  }
+
+  function updateUrl() {
+    const q = mode === 'daily' ? '?mode=daily' : `?diff=${difficulty}&seed=${encodeURIComponent(puzzle.seed)}`;
+    history.replaceState(null, '', location.pathname + q);
+  }
+
+  let activeHint = null; // {type, cells, context}
+  function clearHint() {
+    if (hintTimer) { clearTimeout(hintTimer); hintTimer = null; }
+    if (activeHint) {
+      for (const c of activeHint.cells) cells[c]?.classList.remove('hint', 'hint-x');
+      for (const c of activeHint.context) cells[c]?.classList.remove('hint-ctx');
+      activeHint = null;
+    }
+    els.dismiss.hidden = true;
+    els.apply.hidden = true;
+    els.message.textContent = '';
+  }
+
+  function applyHint() {
+    if (!activeHint || solved || lost) return;
+    const h = activeHint;
+    clearHint();
+    if (h.type === 'elim') {
+      const changes = [];
+      for (const c of h.cells) {
+        if (giraffes.has(c) || wrongX.has(c) || manualX.has(c) || isAutoX(c)) continue;
+        manualX.add(c);
+        changes.push({ idx: c, added: true });
+      }
+      if (changes.length) pushAction({ type: 'drag', changes });
+      render();
+    } else if (h.type === 'place' || h.type === 'reveal') {
+      toggleGiraffe(h.cells[0]);
+    } else if (h.type === 'removeGiraffe') {
+      if (giraffes.has(h.cells[0])) toggleGiraffe(h.cells[0]);
+    } else if (h.type === 'removeX') {
+      const c = h.cells[0];
+      if (manualX.has(c)) {
+        manualX.delete(c);
+        pushAction({ type: 'x', idx: c, added: false });
+        render();
+      }
+    }
+  }
+
+  function setMessage(text) {
+    clearHint();
+    els.message.textContent = text;
+  }
+
+  // ---------- grid ----------
+  function buildGrid() {
+    const n = puzzle.n;
+    els.grid.innerHTML = '';
+    els.grid.style.gridTemplateColumns = `repeat(${n}, 1fr)`;
+    cells = [];
+    for (let i = 0; i < n * n; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.idx = i;
+      cell.style.setProperty('--rc', PALETTE[puzzle.regions[i]].color);
+      const shadows = ['inset 0 0 0 0.5px rgba(0,0,0,0.22)'];
+      const r = Math.floor(i / n), c = i % n;
+      if (r > 0 && puzzle.regions[i] !== puzzle.regions[i - n]) shadows.push('inset 0 3px 0 0 #0a0c12');
+      if (c > 0 && puzzle.regions[i] !== puzzle.regions[i - 1]) shadows.push('inset 3px 0 0 0 #0a0c12');
+      cell.style.boxShadow = shadows.join(', ');
+      const mark = document.createElement('span');
+      mark.className = 'mark';
+      cell.appendChild(mark);
+      els.grid.appendChild(cell);
+      cells.push(cell);
+    }
+    fit();
+    render();
+  }
+
+  function fit() {
+    if (!puzzle) return;
+    els.grid.style.fontSize = `${(els.grid.clientWidth / puzzle.n) * 0.58}px`;
+  }
+  window.addEventListener('resize', fit);
+
+  function computeConflicts() {
+    const n = puzzle.n;
+    const conflicts = new Set();
+    const byRow = new Map(), byCol = new Map(), byReg = new Map();
+    for (const g of giraffes) {
+      const r = Math.floor(g / n), c = g % n, reg = puzzle.regions[g];
+      for (const [map, key] of [[byRow, r], [byCol, c], [byReg, reg]]) {
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(g);
+      }
+    }
+    for (const map of [byRow, byCol, byReg]) {
+      for (const list of map.values()) {
+        if (list.length > 1) list.forEach((g) => conflicts.add(g));
+      }
+    }
+    const list = [...giraffes];
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const r1 = Math.floor(list[i] / n), c1 = list[i] % n;
+        const r2 = Math.floor(list[j] / n), c2 = list[j] % n;
+        if (Math.abs(r1 - r2) <= 1 && Math.abs(c1 - c2) <= 1) {
+          conflicts.add(list[i]); conflicts.add(list[j]);
+        }
+      }
+    }
+    return conflicts;
+  }
+
+  function render() {
+    const conflicts = computeConflicts();
+    for (let i = 0; i < cells.length; i++) {
+      const cell = cells[i];
+      const mark = cell.firstChild;
+      cell.classList.remove('giraffe', 'x-manual', 'x-auto', 'x-wrong', 'conflict');
+      if (giraffes.has(i)) {
+        cell.classList.add('giraffe');
+        mark.textContent = '🦒';
+        if (conflicts.has(i)) cell.classList.add('conflict');
+      } else if (wrongX.has(i)) {
+        cell.classList.add('x-wrong');
+        mark.textContent = '✕';
+      } else if (manualX.has(i)) {
+        cell.classList.add('x-manual');
+        mark.textContent = '✕';
+      } else if (autoCount[i] > 0) {
+        cell.classList.add('x-auto');
+        mark.textContent = '✕';
+      } else {
+        mark.textContent = '';
+      }
+    }
+    checkWin(conflicts);
+  }
+
+  function checkWin(conflicts) {
+    if (solved) return;
+    if (giraffes.size === puzzle.n && conflicts.size === 0) {
+      solved = true;
+      els.grid.classList.add('solved');
+      updateUndoBtn();
+      setMessage('');
+      stopTimer();
+      els.modalRef.textContent = puzzleRef();
+      els.modalTime.hidden = !(mode === 'daily' && timerStart);
+      if (!els.modalTime.hidden) {
+        els.modalTime.textContent = `⏱ ${fmtTime(Date.now() - timerStart)}`;
+      }
+      els.modalTrees.innerHTML =
+        '🌳'.repeat(trees) + (trees < MAX_TREES ? `<span class="eaten">${'🌳'.repeat(MAX_TREES - trees)}</span>` : '');
+      els.modalTrees.title = `${trees} of ${MAX_TREES} trees left`;
+      els.modalHints.textContent = hintsUsed.size === 0
+        ? 'No hints needed 💪'
+        : `Hints used: ${hintsUsed.size}`;
+      els.overlay.hidden = false;
+    }
+  }
+
+  // ---------- moves & undo ----------
+  const isAutoX = (i) => autoCount[i] > 0 && !manualX.has(i) && !giraffes.has(i);
+
+  let undoStack = [];
+  function pushAction(a) { undoStack.push(a); updateUndoBtn(); }
+  function updateUndoBtn() {
+    els.undoBtn.disabled = undoStack.length === 0 || solved || lost;
+  }
+  function doGiraffe(i, add) {
+    if (add) {
+      giraffes.add(i);
+      if (els.autox.checked) for (const j of geom.elim[i]) autoCount[j]++;
+    } else {
+      giraffes.delete(i);
+      if (els.autox.checked) for (const j of geom.elim[i]) autoCount[j]--;
+    }
+  }
+  function reverseAction(a) {
+    if (a.type === 'x') {
+      if (a.added) manualX.delete(a.idx); else manualX.add(a.idx);
+    } else if (a.type === 'drag') {
+      for (const ch of a.changes) {
+        if (ch.added) manualX.delete(ch.idx); else manualX.add(ch.idx);
+      }
+    } else if (a.type === 'giraffe') {
+      if (a.added) {
+        doGiraffe(a.idx, false);
+        if (a.removedX) manualX.add(a.idx);
+      } else {
+        doGiraffe(a.idx, true);
+      }
+    }
+  }
+
+  function toggleGiraffe(i) {
+    if (giraffes.has(i)) {
+      doGiraffe(i, false);
+      pushAction({ type: 'giraffe', idx: i, added: false });
+      render();
+      return;
+    }
+    if (wrongX.has(i)) return;
+    if (!solutionSet.has(i)) { wrongPlacement(i); return; }
+    const removedX = manualX.has(i);
+    manualX.delete(i);
+    doGiraffe(i, true);
+    pushAction({ type: 'giraffe', idx: i, added: true, removedX });
+    render();
+  }
+
+  function wrongPlacement(i) {
+    trees--;
+    renderTrees();
+    const cell = cells[i];
+    const mark = cell.firstChild;
+    cell.classList.add('wrong');
+    mark.textContent = '🦒';
+    if (wrongTimer) clearTimeout(wrongTimer);
+    wrongTimer = setTimeout(() => {
+      cell.classList.remove('wrong');
+      wrongTimer = null;
+      manualX.delete(i);
+      wrongX.add(i);
+      render();
+      if (trees === 0) lose();
+    }, 700);
+    setMessage(trees > 0
+      ? `No giraffe lives there — it ate one of your trees! ${trees} left.`
+      : 'No giraffe lives there — that was your last tree…');
+  }
+
+  function lose() {
+    lost = true;
+    setMessage('');
+    els.lost.hidden = false;
+    updateUndoBtn();
+    stopTimer();
+  }
+
+  // returns the undo-stack entry when it changed something (for double-tap rollback)
+  function singleTap(i) {
+    if (giraffes.has(i) || wrongX.has(i) || isAutoX(i)) return null;
+    const added = !manualX.has(i);
+    if (added) manualX.add(i); else manualX.delete(i);
+    render();
+    const entry = { type: 'x', idx: i, added };
+    pushAction(entry);
+    return entry;
+  }
+
+  function paintX(i, mode, changes) {
+    if (giraffes.has(i) || wrongX.has(i) || isAutoX(i)) return;
+    if (mode === 'paint' && !manualX.has(i)) {
+      manualX.add(i);
+      changes.push({ idx: i, added: true });
+      render();
+    }
+    if (mode === 'erase' && manualX.has(i)) {
+      manualX.delete(i);
+      changes.push({ idx: i, added: false });
+      render();
+    }
+  }
+
+  function recomputeAutoX() {
+    autoCount.fill(0);
+    if (els.autox.checked) {
+      for (const g of giraffes) for (const j of geom.elim[g]) autoCount[j]++;
+    }
+    render();
+  }
+
+  // ---------- pointer handling: tap / double-tap / drag ----------
+  let press = null; // {id, startIdx, x, y, dragging, paintMode}
+  let lastTap = { idx: -1, time: 0, entry: null };
+
+  const cellFromPoint = (x, y) => {
+    const el = document.elementFromPoint(x, y);
+    const cell = el && el.closest ? el.closest('.cell') : null;
+    return cell ? Number(cell.dataset.idx) : -1;
+  };
+
+  els.board.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  els.board.addEventListener('pointerdown', (e) => {
+    if (press || solved || lost || !puzzle) return;
+    const idx = cellFromPoint(e.clientX, e.clientY);
+    if (idx < 0) return;
+    e.preventDefault();
+    press = { id: e.pointerId, startIdx: idx, x: e.clientX, y: e.clientY, dragging: false, paintMode: null, changes: [] };
+  });
+
+  els.board.addEventListener('pointermove', (e) => {
+    if (!press || e.pointerId !== press.id) return;
+    const idx = cellFromPoint(e.clientX, e.clientY);
+    if (!press.dragging) {
+      const moved = Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8;
+      if (!moved && idx === press.startIdx) return;
+      press.dragging = true;
+      press.paintMode = manualX.has(press.startIdx) ? 'erase' : 'paint';
+      paintX(press.startIdx, press.paintMode, press.changes);
+    }
+    if (idx >= 0) paintX(idx, press.paintMode, press.changes);
+  });
+
+  const endPress = (e) => {
+    if (!press || e.pointerId !== press.id) return;
+    const p = press;
+    press = null;
+    if (p.dragging) {
+      if (p.changes.length) pushAction({ type: 'drag', changes: p.changes });
+      lastTap = { idx: -1, time: 0, entry: null };
+      return;
+    }
+    const idx = p.startIdx;
+    const now = e.timeStamp;
+    if (lastTap.idx === idx && now - lastTap.time < 320) {
+      if (lastTap.entry) {
+        reverseAction(lastTap.entry);
+        if (undoStack[undoStack.length - 1] === lastTap.entry) undoStack.pop();
+        updateUndoBtn();
+      }
+      toggleGiraffe(idx);
+      lastTap = { idx: -1, time: 0, entry: null };
+    } else {
+      const entry = singleTap(idx);
+      lastTap = { idx, time: now, entry };
+    }
+  };
+  els.board.addEventListener('pointerup', endPress);
+  els.board.addEventListener('pointercancel', (e) => { if (press && e.pointerId === press.id) press = null; });
+
+  // ---------- controls ----------
+  function setMode(m) {
+    mode = m;
+    els.tabDaily.classList.toggle('active', m === 'daily');
+    els.tabFree.classList.toggle('active', m === 'free');
+    els.diff.hidden = m !== 'free';
+    els.newBtn.hidden = m !== 'free';
+  }
+  function setDifficulty(d) {
+    difficulty = d;
+    for (const b of els.diff.querySelectorAll('button')) {
+      b.classList.toggle('active', b.dataset.d === d);
+    }
+  }
+
+  els.tabDaily.addEventListener('click', () => {
+    if (mode === 'daily') return;
+    setMode('daily');
+    newPuzzle(`daily-${localDate()}`);
+  });
+  els.tabFree.addEventListener('click', () => {
+    if (mode === 'free') return;
+    setMode('free');
+    newPuzzle(randomSeed());
+  });
+  els.diff.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b || b.dataset.d === difficulty) return;
+    setDifficulty(b.dataset.d);
+    newPuzzle(randomSeed());
+  });
+  els.newBtn.addEventListener('click', () => newPuzzle(randomSeed()));
+  els.again.addEventListener('click', () => {
+    if (mode === 'daily') { setMode('free'); }
+    newPuzzle(randomSeed());
+  });
+  els.autox.addEventListener('change', recomputeAutoX);
+
+  els.restart.addEventListener('click', () => {
+    resetBoard();
+    render();
+  });
+  els.resetBtn.addEventListener('click', () => {
+    if (!puzzle) return;
+    resetBoard();
+    render();
+  });
+  els.undoBtn.addEventListener('click', () => {
+    if (!undoStack.length || solved || lost) return;
+    reverseAction(undoStack.pop());
+    updateUndoBtn();
+    render();
+  });
+
+  els.hintBtn.addEventListener('click', () => {
+    if (!puzzle || solved || lost) return;
+    const xs = [];
+    for (let i = 0; i < autoCount.length; i++) {
+      if (!giraffes.has(i) && (manualX.has(i) || wrongX.has(i) || autoCount[i] > 0)) xs.push(i);
+    }
+    const names = puzzle.regions.length ? PALETTE.map((p) => p.name) : [];
+    const h = E.hint(geom, puzzle.solution, { giraffes: [...giraffes], xs }, names);
+    if (!h) return;
+    hintsUsed.add(`${h.type}|${h.cells.join(',')}|${h.text}`);
+    clearHint();
+    els.message.textContent = h.text;
+    const crossOff = h.type === 'elim'; // suggestion to cross cells off: preview the ✕
+    for (const c of h.cells) {
+      cells[c].classList.add('hint');
+      if (crossOff) cells[c].classList.add('hint-x');
+    }
+    for (const c of h.context || []) cells[c].classList.add('hint-ctx');
+    activeHint = { type: h.type, cells: h.cells, context: h.context || [] };
+    els.dismiss.hidden = false;
+    els.apply.hidden = false;
+    hintTimer = setTimeout(clearHint, 20000);
+  });
+  els.dismiss.addEventListener('click', clearHint);
+  els.apply.addEventListener('click', applyHint);
+  els.modalClose.addEventListener('click', () => {
+    els.overlay.hidden = true;
+    els.banner.hidden = false;
+  });
+
+  // ---------- boot ----------
+  const params = new URLSearchParams(location.search);
+  if (params.get('seed')) {
+    setMode('free');
+    setDifficulty(DIFFS[params.get('diff')] ? params.get('diff') : 'medium');
+    newPuzzle(params.get('seed'));
+  } else {
+    setMode('daily');
+    setDifficulty('medium');
+    newPuzzle(`daily-${localDate()}`);
+  }
+})();
+  </script>
+</body>
+</html>
