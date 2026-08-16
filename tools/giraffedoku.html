@@ -297,7 +297,7 @@
     <h1>Giraffe<span>doku</span> 🦒</h1>
     <p class="description">
       A giraffe-herding logic puzzle. Place one giraffe in every row, every column and
-      every paddock — but never let two giraffes stand next to each other, not even
+      every territory — but never let two giraffes stand next to each other, not even
       diagonally, or their necks will tangle. Shared daily puzzles in three difficulties
       plus endless free play, every board with exactly one solution.
     </p>
@@ -890,7 +890,7 @@ const Giraffe = (() => {
 
   // ---------- hints ----------
   function describeGroup(g, names) {
-    if (g.kind === 'region') return `the ${names[g.index]} paddock`;
+    if (g.kind === 'region') return `the ${names[g.index]} territory`;
     return `${g.kind === 'row' ? 'row' : 'column'} ${g.index + 1}`;
   }
   function stepText(step, names, geom) {
@@ -900,13 +900,13 @@ const Giraffe = (() => {
       case 'single':
         return `${describeGroup(step.why, names)} has only one free cell left — that is where its giraffe goes.`;
       case 'region-in-line':
-        return `All free cells of the ${names[step.region]} paddock sit in ${lineName(step.axis, step.line)}, so the rest of that ${step.axis} can be crossed off.`;
+        return `All free cells of the ${names[step.region]} territory sit in ${lineName(step.axis, step.line)}, so the rest of that ${step.axis} can be crossed off.`;
       case 'line-in-region':
-        return `Every free cell of ${lineName(step.axis, step.line)} belongs to the ${names[step.region]} paddock, so that paddock's other cells can be crossed off.`;
+        return `Every free cell of ${lineName(step.axis, step.line)} belongs to the ${names[step.region]} territory, so that territory's other cells can be crossed off.`;
       case 'common-elim':
-        return `Wherever the ${names[step.region]} paddock's giraffe ends up, these cells are always blocked — cross them off.`;
+        return `Wherever the ${names[step.region]} territory's giraffe ends up, these cells are always blocked — cross them off.`;
       case 'pigeonhole':
-        return `${step.regionSet.length} paddocks (${step.regionSet.map((g) => names[g]).join(', ')}) fit entirely inside ${step.regionSet.length} ${step.axis}s — no other paddock can use those ${step.axis}s.`;
+        return `${step.regionSet.length} territories (${step.regionSet.map((g) => names[g]).join(', ')}) fit entirely inside ${step.regionSet.length} ${step.axis}s — no other territory can use those ${step.axis}s.`;
       case 'contradiction': {
         const c = step.cells[0];
         const at = `row ${Math.floor(c / n) + 1}, column ${(c % n) + 1}`;
