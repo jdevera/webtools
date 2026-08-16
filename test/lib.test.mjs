@@ -166,6 +166,17 @@ test('renderIndex escapes HTML in title and description', () => {
   assert.match(html, /&quot;&amp;&quot;/);
 });
 
+test('renderIndex inlines an icon when the tool has one, omits the span otherwise', () => {
+  const template = '<!-- TOOLS -->';
+  const tools = [
+    { slug: 'a', title: 'A', description: 'x', icon: '<svg viewBox="0 0 24 24"></svg>' },
+    { slug: 'b', title: 'B', description: 'y' },
+  ];
+  const html = renderIndex(template, tools);
+  assert.match(html, /<span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><\/svg><\/span>/);
+  assert.equal(html.match(/class="icon"/g).length, 1, 'no icon span for tools without one');
+});
+
 test('renderIndex with empty tools list produces empty placeholder', () => {
   const template = '<ul><!-- TOOLS --></ul>';
   const html = renderIndex(template, []);
@@ -198,6 +209,32 @@ test('main builds dist with index, copied tools, and copied styles', () => {
 
   const indexHtml = fs.readFileSync(path.join(distDir, 'index.html'), 'utf8');
   assert.match(indexHtml, /<a href="\/foo">/);
+});
+
+test('main inlines icons from _index/icons by slug', () => {
+  const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'webtools-build-'));
+  fs.mkdirSync(path.join(repoDir, '_index/icons'), { recursive: true });
+  fs.writeFileSync(path.join(repoDir, '_index/template.html'), '<!-- TOOLS -->');
+  fs.writeFileSync(path.join(repoDir, '_index/style.css'), '');
+  fs.writeFileSync(path.join(repoDir, '_index/icons/foo.svg'), '<svg data-icon="foo"></svg>\n');
+
+  fs.mkdirSync(path.join(repoDir, 'tools'));
+  fs.writeFileSync(
+    path.join(repoDir, 'tools/foo.html'),
+    '<title>Foo</title><body><p class="description">F</p></body>'
+  );
+  fs.writeFileSync(
+    path.join(repoDir, 'tools/bar.html'),
+    '<title>Bar</title><body><p class="description">B</p></body>'
+  );
+
+  const distDir = path.join(repoDir, 'dist');
+  main({ repoDir, distDir });
+
+  const indexHtml = fs.readFileSync(path.join(distDir, 'index.html'), 'utf8');
+  assert.match(indexHtml, /<svg data-icon="foo"><\/svg>/);
+  const barItem = indexHtml.match(/<li><a href="\/bar">.*?<\/li>/)[0];
+  assert.ok(!barItem.includes('class="icon"'), 'tool without an icon file gets no icon span');
 });
 
 test('main wipes dist before building (stale files removed)', () => {

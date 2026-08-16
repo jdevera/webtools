@@ -72,8 +72,11 @@ function escapeHtml(s) {
 export function renderIndex(template, tools) {
   const items = tools.map((t) =>
     `<li><a href="/${encodeURIComponent(t.slug)}">` +
+    (t.icon ? `<span class="icon" aria-hidden="true">${t.icon}</span>` : '') +
+    `<span class="txt">` +
     `<strong>${escapeHtml(t.title)}</strong>` +
     `<small>${escapeHtml(t.description)}</small>` +
+    `</span>` +
     `</a></li>`
   ).join('\n');
   return template.replace('<!-- TOOLS -->', items);
@@ -95,6 +98,11 @@ export function main({ repoDir = process.cwd(), distDir = path.join(repoDir, 'di
 
   const toolsDir = path.join(repoDir, 'tools');
   const tools = fs.existsSync(toolsDir) ? discoverTools(toolsDir) : [];
+
+  for (const tool of tools) {
+    const iconPath = path.join(repoDir, '_index/icons', `${tool.slug}.svg`);
+    if (fs.existsSync(iconPath)) tool.icon = fs.readFileSync(iconPath, 'utf8').trim();
+  }
 
   const template = fs.readFileSync(path.join(repoDir, '_index/template.html'), 'utf8');
   fs.writeFileSync(path.join(distDir, 'index.html'), renderIndex(template, tools));
