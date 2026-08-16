@@ -32,6 +32,9 @@
       flex-direction: column;
     }
 
+    /* the hidden attribute must win over any display rule */
+    [hidden] { display: none !important; }
+
     header {
       padding: 18px 18px 10px 18px;
       display: flex;
@@ -135,7 +138,6 @@
       animation: pop 0.35s ease-out;
     }
     #lost { border-color: var(--bad); }
-    #banner[hidden], #lost[hidden] { display: none; }
     #trees { font-size: 14px; letter-spacing: 2px; }
     #trees .eaten, #modal-trees .eaten { opacity: 0.25; filter: grayscale(1); }
     #timer { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -149,7 +151,6 @@
       justify-content: center;
       z-index: 10;
     }
-    #overlay[hidden] { display: none; }
     #win-modal {
       background: linear-gradient(180deg, var(--panel), var(--panel2));
       border: 1px solid var(--good);
@@ -162,7 +163,6 @@
     #win-modal h2 { margin: 0 0 10px; font-size: 18px; }
     #win-modal p { margin: 6px 0; font-size: 14px; color: var(--text); }
     #win-modal #modal-ref { font-size: 12px; color: var(--muted); letter-spacing: 0.04em; }
-    #win-modal p[hidden] { display: none; }
     #win-modal #modal-trees { font-size: 18px; letter-spacing: 3px; }
     #win-modal button { margin-top: 12px; }
     @keyframes pop { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -272,8 +272,8 @@
     <p class="description">
       A giraffe-herding logic puzzle. Place one giraffe in every row, every column and
       every paddock — but never let two giraffes stand next to each other, not even
-      diagonally, or their necks will tangle. A shared daily puzzle plus endless free
-      play in three difficulties, every board with exactly one solution.
+      diagonally, or their necks will tangle. Shared daily puzzles in three difficulties
+      plus endless free play, every board with exactly one solution.
     </p>
   </header>
 
@@ -961,7 +961,6 @@ const Giraffe = (() => {
     medium: { sizes: [8, 9], tier: 2 },
     hard: { sizes: [10, 11], tier: 3 },
   };
-  const DAILY = { sizes: [8], tier: 2 };
 
   // ---------- state ----------
   let mode = 'daily';           // 'daily' | 'free'
@@ -988,12 +987,14 @@ const Giraffe = (() => {
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   };
   const randomSeed = () => Math.random().toString(36).slice(2, 8);
+  // one shared puzzle per date and difficulty
+  const dailySeed = () => `daily-${localDate()}-${difficulty}`;
 
   // ---------- generation ----------
   async function newPuzzle(seed) {
     const genMode = mode;
-    const genDiff = genMode === 'daily' ? 'medium' : difficulty;
-    const cfg = genMode === 'daily' ? DAILY : DIFFS[difficulty];
+    const genDiff = difficulty;
+    const cfg = DIFFS[difficulty];
     const token = ++genToken;
     els.grid.classList.add('busy');
     els.banner.hidden = true;
@@ -1026,7 +1027,7 @@ const Giraffe = (() => {
     puzzle.mode = genMode;
     puzzle.diff = genDiff;
     if (genMode === 'daily') {
-      const [y, mo, d] = seed.slice('daily-'.length).split('-').map(Number);
+      const [, y, mo, d] = /^daily-(\d{4})-(\d{2})-(\d{2})/.exec(seed).map(Number);
       puzzle.date = new Date(y, mo - 1, d)
         .toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
     }
@@ -1106,7 +1107,7 @@ const Giraffe = (() => {
   }
 
   function updateUrl() {
-    const q = puzzle.mode === 'daily' ? '?mode=daily' : `?diff=${puzzle.diff}&seed=${encodeURIComponent(puzzle.seed)}`;
+    const q = puzzle.mode === 'daily' ? `?mode=daily&diff=${puzzle.diff}` : `?diff=${puzzle.diff}&seed=${encodeURIComponent(puzzle.seed)}`;
     history.replaceState(null, '', location.pathname + q);
   }
 
@@ -1445,7 +1446,6 @@ const Giraffe = (() => {
     mode = m;
     els.tabDaily.classList.toggle('active', m === 'daily');
     els.tabFree.classList.toggle('active', m === 'free');
-    els.diff.hidden = m !== 'free';
     els.newBtn.hidden = m !== 'free';
   }
   function setDifficulty(d) {
@@ -1458,7 +1458,7 @@ const Giraffe = (() => {
   els.tabDaily.addEventListener('click', () => {
     if (mode === 'daily') return;
     setMode('daily');
-    newPuzzle(`daily-${localDate()}`);
+    newPuzzle(dailySeed());
   });
   els.tabFree.addEventListener('click', () => {
     if (mode === 'free') return;
@@ -1469,7 +1469,7 @@ const Giraffe = (() => {
     const b = e.target.closest('button');
     if (!b || b.dataset.d === difficulty) return;
     setDifficulty(b.dataset.d);
-    newPuzzle(randomSeed());
+    newPuzzle(mode === 'daily' ? dailySeed() : randomSeed());
   });
   els.newBtn.addEventListener('click', () => newPuzzle(randomSeed()));
   els.again.addEventListener('click', () => {
@@ -1532,8 +1532,8 @@ const Giraffe = (() => {
     newPuzzle(params.get('seed'));
   } else {
     setMode('daily');
-    setDifficulty('medium');
-    newPuzzle(`daily-${localDate()}`);
+    setDifficulty(DIFFS[params.get('diff')] ? params.get('diff') : 'medium');
+    newPuzzle(dailySeed());
   }
 })();
   </script>
