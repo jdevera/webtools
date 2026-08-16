@@ -115,6 +115,41 @@ test('hint flags an X sitting on the solution', () => {
   assert.equal(h.type, 'removeX');
 });
 
+test('contradiction hints record the forced chain and prefer the shallowest', () => {
+  const p = E.generate([10, 11], 3, 'contra-a', 60);
+  const geom = E.makeGeom(p.n, p.regions);
+  const state = E.newState(geom);
+  const apply = (s) => { if (s.type === 'place') E.placeAt(state, s.cell); else for (const c of s.cells) state.cand[c] = 1; };
+  let step;
+  while ((step = E.findStep(state, 3)) && step.rule !== 'contradiction') {
+    apply(step);
+    assert.ok(state.placed < p.n, 'expected a contradiction step before the puzzle solved');
+  }
+  assert.ok(step, 'solver got stuck without a contradiction step');
+  assert.ok(Array.isArray(step.chain), 'contradiction steps carry their forced chain');
+  for (const link of step.chain) {
+    assert.ok(Number.isInteger(link.cell));
+    assert.ok(['region', 'row', 'col'].includes(link.why.kind));
+  }
+  const best = E.findContradiction(state, true);
+  assert.ok(best.chain.length <= step.chain.length, 'best scan must not pick a deeper chain');
+  // the hint uses the shallow scan and words the step to match its depth
+  const board = { giraffes: [], xs: [] };
+  for (let i = 0; i < p.n * p.n; i++) {
+    if (state.cand[i] === 2) board.giraffes.push(i);
+    else if (state.cand[i] === 1) board.xs.push(i);
+  }
+  const names = Array.from({ length: p.n }, (_, i) => `color${i}`);
+  const h = E.hint(geom, p.solution, board, names);
+  assert.equal(h.type, 'elim');
+  assert.equal(h.chain.length, best.chain.length);
+  if (h.chain.length === 0) {
+    assert.match(h.text, /would take away every cell/);
+  } else {
+    assert.match(h.text, /ghosted cells/);
+  }
+});
+
 test('hint returns a logical step on a fresh board', () => {
   const p = E.generate([6], 1, 'hint-seed', 60);
   const geom = E.makeGeom(p.n, p.regions);

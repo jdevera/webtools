@@ -93,6 +93,44 @@ test('winning shows a modal that describes the solved puzzle', async () => {
   }
 });
 
+const encodeState = (obj) =>
+  Buffer.from(JSON.stringify(obj)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+test('a state URL restores marks and trees; the debug bar can capture them back', async () => {
+  const state = encodeState({ g: [], x: [0], w: [1], t: 2 });
+  const { dom, $ } = await boot(`?diff=easy&seed=abc123&state=${state}&debug=1`);
+  try {
+    assert.equal($('debugbar').hidden, false, 'debug param shows the debug bar');
+    const cells = dom.window.document.querySelectorAll('.cell');
+    await waitFor(() => cells[0].classList.contains('x-manual'), 'restored state to render');
+    assert.ok(cells[1].classList.contains('x-wrong'), 'wrong ✕ restored');
+    assert.ok($('trees').innerHTML.includes('eaten'), 'lost tree restored');
+
+    let copied = null;
+    Object.defineProperty(dom.window.navigator, 'clipboard', {
+      value: { writeText: (t) => { copied = t; return Promise.resolve(); } },
+      configurable: true,
+    });
+    $('save-state').click();
+    await waitFor(() => copied !== null, 'state URL copied');
+    assert.match(copied, /\?diff=easy&seed=abc123&state=[\w-]+&debug=1$/);
+    const roundTrip = JSON.parse(Buffer.from(
+      new URL(copied).searchParams.get('state').replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
+    assert.deepEqual(roundTrip, { g: [], x: [0], w: [1], t: 2 });
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('without the debug param there is no debug bar', async () => {
+  const { dom, $ } = await boot('?diff=easy&seed=abc123');
+  try {
+    assert.equal($('debugbar').hidden, true);
+  } finally {
+    dom.window.close();
+  }
+});
+
 test('the hidden attribute always wins over display rules', () => {
   // a bare display:flex/grid on a container silently defeats [hidden];
   // the stylesheet must carry the global override

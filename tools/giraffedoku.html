@@ -245,6 +245,32 @@
       border: 2px dashed rgba(251,191,36,0.55);
       pointer-events: none;
     }
+    /* forced-chain preview: ghost giraffe plus its step number */
+    .cell.hint-chain::before {
+      content: '🦒';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.55;
+      filter: grayscale(0.4);
+      pointer-events: none;
+    }
+    .cell.hint-chain::after {
+      content: attr(data-step);
+      position: absolute;
+      top: 2px;
+      right: 3px;
+      font-size: 0.6em;
+      font-weight: 800;
+      line-height: 1.4;
+      padding: 0 0.4em;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #1a1c26;
+      pointer-events: none;
+    }
     @keyframes pulse { 50% { opacity: 0.45; } }
 
     #grid.solved .cell.giraffe .mark { animation: bounce 0.7s ease; }
@@ -292,6 +318,10 @@
       <label class="toggle"><input type="checkbox" id="autox" /> Auto-✕</label>
       <button id="undo-btn" disabled>Undo</button>
       <button id="reset-btn">Reset</button>
+    </div>
+
+    <div class="controls" id="debugbar" hidden>
+      <button id="save-state">Copy state URL</button>
     </div>
 
     <div class="statusline">
@@ -696,21 +726,37 @@ const Giraffe = (() => {
       }
     }
     // tier 3: hypothetical placement leads to a dead group
+    return findContradiction(state, false);
+  }
+
+  // Simulate a giraffe on each open cell, following the forced tier-1 moves,
+  // until some group is left with no cells. chain records the forced
+  // placements so a hint can walk the player through them. With best=true,
+  // scan every cell and keep the shortest chain (the easiest one to follow)
+  // instead of returning the first refutable cell.
+  function findContradiction(state, best) {
+    const n = state.geom.n;
+    let found = null;
     for (let i = 0; i < n * n; i++) {
       if (state.cand[i] !== 0) continue;
       const sim = cloneState(state);
       placeAt(sim, i);
+      const chain = [];
       let s;
-      while (!hasContradiction(sim) && (s = findStep(sim, 1))) applyStep(sim, s);
-      if (hasContradiction(sim)) {
-        const dead = sim.geom.groups.find((g) => !satisfied(sim, g) && openCells(sim, g).length === 0);
-        return {
-          type: 'elim', tier: 3, rule: 'contradiction', cells: [i],
-          dead: { kind: dead.kind, index: dead.index },
-        };
+      while (!hasContradiction(sim) && (s = findStep(sim, 1))) {
+        if (s.type === 'place') chain.push({ cell: s.cell, why: { kind: s.why.kind, index: s.why.index } });
+        applyStep(sim, s);
       }
+      if (!hasContradiction(sim)) continue;
+      if (found && chain.length >= found.chain.length) continue;
+      const dead = sim.geom.groups.find((g) => !satisfied(sim, g) && openCells(sim, g).length === 0);
+      found = {
+        type: 'elim', tier: 3, rule: 'contradiction', cells: [i],
+        dead: { kind: dead.kind, index: dead.index }, chain,
+      };
+      if (!best || chain.length === 0) return found;
     }
-    return null;
+    return found;
   }
 
   // Simulate a human solving with logic only. Rating = hardest tier needed.
@@ -863,8 +909,13 @@ const Giraffe = (() => {
         return `${step.regionSet.length} paddocks (${step.regionSet.map((g) => names[g]).join(', ')}) fit entirely inside ${step.regionSet.length} ${step.axis}s — no other paddock can use those ${step.axis}s.`;
       case 'contradiction': {
         const c = step.cells[0];
+        const at = `row ${Math.floor(c / n) + 1}, column ${(c % n) + 1}`;
         const victim = describeGroup(step.dead, names);
-        return `A giraffe at row ${Math.floor(c / n) + 1}, column ${(c % n) + 1} would take away every cell ${step.dead.kind === 'region' ? 'of' : 'left in'} ${victim} — so no giraffe can stand here. Cross it off.`;
+        const chain = step.chain || [];
+        if (chain.length === 0) {
+          return `A giraffe at ${at} would take away every cell ${step.dead.kind === 'region' ? 'of' : 'left in'} ${victim} — so no giraffe can stand here. Cross it off.`;
+        }
+        return `A giraffe at ${at} would start a chain: ${chain.length === 1 ? 'one more giraffe' : `${chain.length} more giraffes`} would be forced into the ghosted cells (follow the numbers), and ${victim} would be left with nowhere to go. So no giraffe can stand at ${at} — cross it off.`;
       }
       default:
         return 'The next step follows logically.';
@@ -887,7 +938,10 @@ const Giraffe = (() => {
     const state = newState(geom);
     for (const g of board.giraffes) placeAt(state, g);
     for (const x of board.xs) if (state.cand[x] === 0) state.cand[x] = 1;
-    const step = findStep(state, 3);
+    let step = findStep(state, 3);
+    // contradictions are a last resort; when one is needed, pick the
+    // shallowest chain on the whole board so it is the easiest to follow
+    if (step && step.rule === 'contradiction') step = findContradiction(state, true);
     if (step) {
       const text = stepText(step, names, geom);
       let context = [];
@@ -903,6 +957,7 @@ const Giraffe = (() => {
         type: step.type,
         cells: step.type === 'place' ? [step.cell] : step.cells,
         context: context.filter((c) => !step.cells.includes(c)),
+        chain: step.rule === 'contradiction' ? step.chain.map((s) => s.cell) : [],
         text: text.charAt(0).toUpperCase() + text.slice(1),
       };
     }
@@ -916,7 +971,7 @@ const Giraffe = (() => {
 
   return {
     rngFromString, randomPlacement, growRegions, refineToUnique, makeGeom,
-    countSolutions, ratePuzzle, findStep, newState, placeAt,
+    countSolutions, ratePuzzle, findStep, findContradiction, newState, placeAt,
     createGenerator, generate, hint,
   };
 })();
@@ -931,6 +986,7 @@ const Giraffe = (() => {
     tabDaily: $('tab-daily'), tabFree: $('tab-free'), diff: $('diff'),
     newBtn: $('new'), autox: $('autox'), hintBtn: $('hint-btn'),
     undoBtn: $('undo-btn'), resetBtn: $('reset-btn'),
+    debugbar: $('debugbar'), saveState: $('save-state'),
     label: $('puzzle-label'), message: $('message'), banner: $('banner'),
     again: $('again'), board: $('board'), grid: $('grid'),
     trees: $('trees'), lost: $('lost'), restart: $('restart'),
@@ -1111,12 +1167,16 @@ const Giraffe = (() => {
     history.replaceState(null, '', location.pathname + q);
   }
 
-  let activeHint = null; // {type, cells, context}
+  let activeHint = null; // {type, cells, context, chain}
   function clearHint() {
     if (hintTimer) { clearTimeout(hintTimer); hintTimer = null; }
     if (activeHint) {
       for (const c of activeHint.cells) cells[c]?.classList.remove('hint', 'hint-x');
       for (const c of activeHint.context) cells[c]?.classList.remove('hint-ctx');
+      for (const c of activeHint.chain) {
+        cells[c]?.classList.remove('hint-chain');
+        delete cells[c]?.dataset.step;
+      }
       activeHint = null;
     }
     els.dismiss.hidden = true;
@@ -1512,7 +1572,12 @@ const Giraffe = (() => {
       if (crossOff) cells[c].classList.add('hint-x');
     }
     for (const c of h.context || []) cells[c].classList.add('hint-ctx');
-    activeHint = { type: h.type, cells: h.cells, context: h.context || [] };
+    const chain = h.chain || [];
+    chain.forEach((c, k) => {
+      cells[c].classList.add('hint-chain');
+      cells[c].dataset.step = k + 1;
+    });
+    activeHint = { type: h.type, cells: h.cells, context: h.context || [], chain };
     els.dismiss.hidden = false;
     els.apply.hidden = false;
     hintTimer = setTimeout(clearHint, 20000);
@@ -1524,12 +1589,43 @@ const Giraffe = (() => {
     els.banner.hidden = false;
   });
 
+  // ---------- debug: capture and restore a game state via the URL ----------
+  function stateUrl() {
+    const s = { g: [...giraffes], x: [...manualX], w: [...wrongX], t: trees };
+    const b64 = btoa(JSON.stringify(s)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return `${location.origin}${location.pathname}?diff=${puzzle.diff}&seed=${encodeURIComponent(puzzle.seed)}&state=${b64}&debug=1`;
+  }
+  function restoreState(encoded) {
+    if (!encoded || !puzzle) return;
+    try {
+      const s = JSON.parse(atob(encoded.replace(/-/g, '+').replace(/_/g, '/')));
+      const valid = (list) => (Array.isArray(list) ? list.filter((i) => Number.isInteger(i) && i >= 0 && i < puzzle.n * puzzle.n) : []);
+      for (const i of valid(s.g)) giraffes.add(i);
+      for (const i of valid(s.x)) manualX.add(i);
+      for (const i of valid(s.w)) wrongX.add(i);
+      if (Number.isInteger(s.t)) trees = Math.max(0, Math.min(MAX_TREES, s.t));
+      renderTrees();
+      recomputeAutoX();
+    } catch { /* malformed state param: leave the fresh board */ }
+  }
+  els.saveState.addEventListener('click', async () => {
+    if (!puzzle) return;
+    const url = stateUrl();
+    try {
+      await navigator.clipboard.writeText(url);
+      setMessage('State URL copied.');
+    } catch {
+      window.prompt('Copy this state URL:', url);
+    }
+  });
+
   // ---------- boot ----------
   const params = new URLSearchParams(location.search);
+  els.debugbar.hidden = !params.has('debug');
   if (params.get('seed')) {
     setMode('free');
     setDifficulty(DIFFS[params.get('diff')] ? params.get('diff') : 'medium');
-    newPuzzle(params.get('seed'));
+    newPuzzle(params.get('seed')).then(() => restoreState(params.get('state')));
   } else {
     setMode('daily');
     setDifficulty(DIFFS[params.get('diff')] ? params.get('diff') : 'medium');
