@@ -5,5 +5,8 @@
   "scripts": {
     "build": "node build.mjs",
     "test": "node --test"
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.1"
   }
 }
