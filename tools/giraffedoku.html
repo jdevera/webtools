@@ -991,7 +991,9 @@ const Giraffe = (() => {
 
   // ---------- generation ----------
   async function newPuzzle(seed) {
-    const cfg = mode === 'daily' ? DAILY : DIFFS[difficulty];
+    const genMode = mode;
+    const genDiff = genMode === 'daily' ? 'medium' : difficulty;
+    const cfg = genMode === 'daily' ? DAILY : DIFFS[difficulty];
     const token = ++genToken;
     els.grid.classList.add('busy');
     els.banner.hidden = true;
@@ -1013,8 +1015,21 @@ const Giraffe = (() => {
         await new Promise((res) => setTimeout(res));
       }
     }
-    if (!result) { setMessage('Could not build a puzzle — try again.'); return; }
+    if (!result) {
+      setMessage('Could not build a puzzle — try again.');
+      els.grid.classList.remove('busy');
+      return;
+    }
     puzzle = result;
+    // snapshot the request context: the label/modal must describe the puzzle
+    // as generated, not whatever the controls say when it is finally solved
+    puzzle.mode = genMode;
+    puzzle.diff = genDiff;
+    if (genMode === 'daily') {
+      const [y, mo, d] = seed.slice('daily-'.length).split('-').map(Number);
+      puzzle.date = new Date(y, mo - 1, d)
+        .toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
     geom = E.makeGeom(puzzle.n, puzzle.regions);
     solutionSet = new Set(puzzle.solution.map((c, r) => r * puzzle.n + c));
     resetBoard();
@@ -1022,7 +1037,7 @@ const Giraffe = (() => {
     updateLabel();
     updateUrl();
     els.grid.classList.remove('busy');
-    if (mode === 'daily') startTimer(); else hideTimer();
+    if (puzzle.mode === 'daily') startTimer(); else hideTimer();
   }
 
   function resetBoard() {
@@ -1042,7 +1057,7 @@ const Giraffe = (() => {
     updateUndoBtn();
     setMessage('');
     renderTrees();
-    if (mode === 'daily' && puzzle) startTimer();
+    if (puzzle && puzzle.mode === 'daily') startTimer();
   }
 
   // ---------- daily timer ----------
@@ -1080,11 +1095,10 @@ const Giraffe = (() => {
 
   function puzzleRef() {
     const size = `${puzzle.n}×${puzzle.n}`;
-    if (mode === 'daily') {
-      const date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-      return `Daily · ${date} · ${size} · medium`;
+    if (puzzle.mode === 'daily') {
+      return `Daily · ${puzzle.date} · ${size} · ${puzzle.diff}`;
     }
-    const tierNote = puzzle.exact ? difficulty : `${difficulty} (closest fit)`;
+    const tierNote = puzzle.exact ? puzzle.diff : `${puzzle.diff} (closest fit)`;
     return `Free play · ${tierNote} · ${size} · seed ${puzzle.seed}`;
   }
   function updateLabel() {
@@ -1092,7 +1106,7 @@ const Giraffe = (() => {
   }
 
   function updateUrl() {
-    const q = mode === 'daily' ? '?mode=daily' : `?diff=${difficulty}&seed=${encodeURIComponent(puzzle.seed)}`;
+    const q = puzzle.mode === 'daily' ? '?mode=daily' : `?diff=${puzzle.diff}&seed=${encodeURIComponent(puzzle.seed)}`;
     history.replaceState(null, '', location.pathname + q);
   }
 
@@ -1237,7 +1251,7 @@ const Giraffe = (() => {
       setMessage('');
       stopTimer();
       els.modalRef.textContent = puzzleRef();
-      els.modalTime.hidden = !(mode === 'daily' && timerStart);
+      els.modalTime.hidden = !(puzzle.mode === 'daily' && timerStart);
       if (!els.modalTime.hidden) {
         els.modalTime.textContent = `⏱ ${fmtTime(Date.now() - timerStart)}`;
       }
