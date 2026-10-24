@@ -808,23 +808,6 @@
         warnings.push("This is Audible DRM-encrypted audio; metadata is readable but the browser cannot play it.");
       }
 
-      // The "M4A " major brand declares an audio-only file. When the file also
-      // carries a cover-art video track or a chapter text track, Safari/QuickTime
-      // refuse to open it (MEDIA_ERR_SRC_NOT_SUPPORTED) even though the audio is
-      // plain AAC. Changing the brand to "M4B "/"isom" fixes it without re-encoding.
-      const hasVideoTrack = traks.some(t => handlerType(dv, t) === "vide");
-      const hasTextTrack = traks.some(t => ["text", "sbtl"].includes(handlerType(dv, t)));
-      let playbackWarning = null;
-      if (ftypInfo && ftypInfo.major.trim() === "M4A" && (hasVideoTrack || hasTextTrack)) {
-        const extra = [];
-        if (hasVideoTrack) extra.push("a cover-art video track");
-        if (hasTextTrack) extra.push("a chapter text track");
-        playbackWarning = 'The ftyp major brand is "M4A " (which declares an audio-only file), but this file also contains non-audio tracks ('
-          + extra.join(" and ") + '). Some players — notably Safari/QuickTime — refuse to play such files. '
-          + 'Changing the major brand to "M4B " or "isom" (a 4-byte edit of the ftyp major-brand field, no re-encode) typically fixes playback.';
-        warnings.push(playbackWarning);
-      }
-
       const ilst = atPath(moov, "udta.meta.ilst");
       const tags = ilst ? extractTags(dv, ilst) : [];
       if (!ilst) warnings.push("No iTunes-style tag list (moov/udta/meta/ilst) found.");
@@ -861,7 +844,7 @@
       const mdatBytes = top.filter(a => a.type === "mdat").reduce((s, a) => s + a.size, 0);
       const bitrateKbps = duration && mdatBytes ? (mdatBytes * 8) / duration / 1000 : null;
 
-      return { top, moov, dv, ftypInfo, duration, audio, tags, chapters, chapterSource, mdatBytes, bitrateKbps, playbackWarning, warnings };
+      return { top, moov, dv, ftypInfo, duration, audio, tags, chapters, chapterSource, mdatBytes, bitrateKbps, warnings };
     }
 
     // ---------- UI ----------
@@ -874,7 +857,7 @@
 
     let mediaUrl = null, coverUrl = null;
     let chapterRows = [], chapterStarts = [], chapterTitles = [], currentChapter = -1;
-    let isDrm = false, playbackHint = "";
+    let isDrm = false;
 
     function setStatus(msg) { statusEl.textContent = msg || ""; }
 
@@ -908,7 +891,6 @@
 
     function render(r, file) {
       isDrm = !!(r.audio && r.audio.format === "aavd");
-      playbackHint = r.playbackWarning || "";
       const tagValue = key => {
         const t = r.tags.find(t => t.key === key && t.kind !== "image");
         return t ? (t.value ?? t.display) : null;
@@ -1108,8 +1090,6 @@
       if (err.message) parts.push("Engine detail: " + err.message);
       if (isDrm) {
         parts.push("The audio track is Audible DRM (aavd), which browsers cannot decrypt — almost certainly the cause.");
-      } else if (playbackHint) {
-        parts.push("Likely cause: " + playbackHint);
       } else {
         parts.push("The metadata above is parsed separately and is unaffected. A valid-looking file failing here usually means a browser playback limit — very large files or a container quirk — not a broken file.");
       }
@@ -1126,7 +1106,9 @@
         const result = await parseM4b(file);
         render(result, file);
         if (mediaUrl) URL.revokeObjectURL(mediaUrl);
-        mediaUrl = URL.createObjectURL(file);
+        // Safari may leave .m4b File.type empty and reject the resulting blob URL.
+        // Set the playback MIME type without reading or modifying the file's bytes.
+        mediaUrl = URL.createObjectURL(file.slice(0, file.size, "audio/mp4"));
         player.src = mediaUrl;
         document.body.classList.add("loaded");
         setStatus(`${file.name} — ${fmtBytes(file.size)}, parsed in ${Math.round(performance.now() - t0)} ms`);
